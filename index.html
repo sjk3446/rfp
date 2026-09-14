@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="파일을 서버에 올리지 않고 브라우저에서 분석하는 RFP 요구사항 관리 도구">
+  <title>Reqly — RFP 요구사항 관리 에이전트</title>
+  <link rel="stylesheet" href="./styles.css?v=4.0.2">
+</head>
+<body>
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16M7 12h10M10 19h4"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.7 2.2c-.9.5-1.4 1-1.4 2M12 17h.01"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M4 6.5A2.5 2.5 0 0 1 6.5 9H20"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8z"/><path d="M8 9h8M8 13h5"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 22V3M6 4h11l-2 4 2 4H6"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.1 1.1M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></symbol>
+  </svg>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#" aria-label="Reqly 홈">
+        <span class="brand-mark"><svg><use href="#i-spark"></use></svg></span>
+        <span>reqly</span>
+      </a>
+
+      <nav class="nav-list" aria-label="주요 메뉴">
+        <p class="nav-label">WORKSPACE</p>
+        <button class="nav-item active" data-view="requirements"><svg><use href="#i-list"></use></svg><span>요구사항 관리</span><span class="nav-count" id="navCount">0</span></button>
+        <button class="nav-item" data-view="dashboard"><svg><use href="#i-grid"></use></svg><span>분석 대시보드</span></button>
+        <button class="nav-item" data-view="documents"><svg><use href="#i-file"></use></svg><span>문서 정보</span></button>
+      </nav>
+
+      <div class="sidebar-project">
+        <div class="project-icon"><svg><use href="#i-file"></use></svg></div>
+        <div class="project-copy">
+          <span class="project-eyebrow">현재 프로젝트</span>
+          <strong id="sidebarProject">새 RFP 프로젝트</strong>
+        </div>
+        <button class="icon-button small" id="projectManagerButton" title="프로젝트 관리"><svg><use href="#i-dots"></use></svg></button>
+        <button id="clearProject" type="button" hidden aria-hidden="true"></button>
+      </div>
+
+      <div class="privacy-card">
+        <div class="privacy-icon"><svg><use href="#i-shield"></use></svg></div>
+        <div><strong>이 브라우저에만 저장</strong><p>문서와 작업 내용은 GitHub나 별도 서버에 업로드되지 않습니다.</p></div>
+      </div>
+      <p class="version">REQly Pages · v4.0</p>
+    </aside>
+
+    <button class="mobile-scrim" id="mobileScrim" aria-label="메뉴 닫기"></button>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="heading-wrap">
+          <button class="icon-button mobile-menu" id="menuButton" aria-label="메뉴 열기"><svg><use href="#i-menu"></use></svg></button>
+          <div><p class="breadcrumb">RFP 분석 워크스페이스</p><h1>요구사항 관리</h1></div>
+        </div>
+        <div class="top-actions">
+          <button class="button ghost" id="projectButton"><svg><use href="#i-file"></use></svg><span>프로젝트</span></button>
+          <button class="button ghost" id="aiSettingsButton"><svg><use href="#i-shield"></use></svg><span>AI 연결</span></button>
+          <button class="button ghost" id="sampleButton"><svg><use href="#i-spark"></use></svg><span>샘플 데이터</span></button>
+          <button class="button primary" id="uploadButton"><svg><use href="#i-upload"></use></svg><span>RFP·자료 업로드</span></button>
+          <input type="file" id="fileInput" hidden multiple accept=".pdf,.docx,.pptx,.hwpx,.hwp,.xlsx,.xlsm,.xls,.txt,.md,.csv,.tsv,.json,.xml">
+        </div>
+      </header>
+
+      <div class="page-content">
+        <section class="document-banner" id="documentBanner">
+          <div class="document-type" id="documentType">PDF</div>
+          <div class="document-main">
+            <div class="document-title-row"><h2 id="documentName">분석할 RFP를 업로드해 주세요</h2><span class="badge neutral" id="documentBadge">준비됨</span></div>
+            <p id="documentMeta">PDF, DOCX, HWPX, XLSX, TXT, MD, CSV · 최대 30MB</p>
+          </div>
+          <div class="document-progress">
+            <div class="progress-copy"><span>검토 진행률</span><strong id="reviewProgressText">0%</strong></div>
+            <div class="progress-track"><span id="reviewProgressBar" style="width:0%"></span></div>
+          </div>
+        </section>
+
+        <section class="reference-panel" id="referencePanel">
+          <div class="reference-heading"><div><strong>RFP 관련 자료</strong><span class="reference-count" id="referenceCount">0</span></div><p>회의록, 녹취록 문서, 제안 설명자료 등을 연결하면 요구사항별 쉬운 설명에 반영합니다. 상단에서 여러 파일을 한 번에 고를 때는 RFP를 첫 번째로 선택하세요.</p></div>
+          <div class="reference-list" id="referenceList"></div>
+          <button class="button ghost reference-button" id="referenceButton"><svg><use href="#i-plus"></use></svg>관련 자료 추가</button>
+          <input type="file" id="referenceInput" hidden multiple accept=".pdf,.docx,.pptx,.hwpx,.hwp,.xlsx,.xlsm,.xls,.txt,.md,.csv,.tsv,.json,.xml">
+        </section>
+
+        <section class="metric-grid" aria-label="요구사항 요약">
+          <article class="metric-card accent-teal">
+            <div class="metric-head"><span>전체 요구사항</span><span class="metric-icon"><svg><use href="#i-list"></use></svg></span></div>
+            <strong id="metricTotal">0</strong><p><span class="trend up">브라우저 추출</span> 후 직접 편집 가능</p>
+          </article>
+          <article class="metric-card accent-violet">
+            <div class="metric-head"><span>신규 요구사항</span><span class="metric-icon"><svg><use href="#i-plus"></use></svg></span></div>
+            <strong id="metricNew">0</strong><p>아직 검토하지 않은 항목</p>
+          </article>
+          <article class="metric-card accent-amber">
+            <div class="metric-head"><span>확정 완료</span><span class="metric-icon"><svg><use href="#i-check"></use></svg></span></div>
+            <strong id="metricConfirmed">0</strong><p>전체 중 <span id="metricConfirmedRate">0%</span> 확정</p>
+          </article>
+          <article class="metric-card accent-blue">
+            <div class="metric-head"><span>완료 요구사항</span><span class="metric-icon"><svg><use href="#i-check"></use></svg></span></div>
+            <strong id="metricCompleted">0</strong><p><span class="trend">적용 완료</span> 처리된 항목</p>
+          </article>
+        </section>
+
+        <section class="content-card">
+          <div class="card-header">
+            <div><h2>요구사항 목록</h2><p id="listDescription">업로드한 RFP에서 추출한 요구사항을 검토하고 관리하세요.</p></div>
+            <div class="card-actions">
+              <button class="button qa-button" id="qaExportButton"><svg><use href="#i-message"></use></svg><span>질의응답서 생성</span><b id="qaCount">0</b></button>
+              <div class="export-wrap">
+                <button class="button ghost" id="exportButton"><svg><use href="#i-download"></use></svg>내보내기</button>
+                <div class="export-menu" id="exportMenu">
+                  <button data-export="csv"><strong>CSV 파일</strong><span>Excel에서 바로 열기</span></button>
+                  <button data-export="json"><strong>JSON 파일</strong><span>시스템 연계용 원본</span></button>
+                </div>
+              </div>
+              <button class="button dark" id="addButton"><svg><use href="#i-plus"></use></svg>요구사항 추가</button>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <label class="search-box"><svg><use href="#i-search"></use></svg><input id="searchInput" type="search" placeholder="고유번호, 명칭, 상세 설명 검색" autocomplete="off"><kbd>⌘ K</kbd></label>
+            <div class="filter-group">
+              <label class="select-wrap"><span class="sr-only">분류</span><select id="categoryFilter"><option value="all">전체 분류</option></select></label>
+              <label class="select-wrap"><span class="sr-only">상태</span><select id="statusFilter"><option value="all">전체 상태</option><option>검토 전</option><option>검토 중</option><option>확정</option></select></label>
+              <label class="select-wrap"><span class="sr-only">우선순위</span><select id="priorityFilter"><option value="all">전체 우선순위</option><option>높음</option><option>보통</option><option>낮음</option></select></label>
+              <label class="select-wrap"><span class="sr-only">플래그</span><select id="flagFilter"><option value="all">전체 플래그</option><option value="flagged">🚩 플래그 있음</option><option value="red">🔴 빨강 플래그</option><option value="orange">🟠 주황 플래그</option><option value="yellow">🟡 노랑 플래그</option><option value="green">🟢 초록 플래그</option><option value="blue">🔵 파랑 플래그</option><option value="none">⚪ 플래그 없음</option></select></label>
+              <label class="select-wrap sort-wrap"><span class="sr-only">정렬</span><select id="sortFilter"><option value="sourceOrder:1">RFP 원문 순서</option><option value="flag:-1">플래그 우선순</option><option value="id:1">고유번호 계층순</option><option value="id:-1">고유번호 역순</option><option value="name:1">명칭 가나다순</option><option value="category:1">분류 가나다순</option><option value="confidence:-1">신뢰도 높은 순</option></select></label>
+              <button class="icon-button filter-reset" id="filterReset" title="필터 초기화"><svg><use href="#i-filter"></use></svg></button>
+            </div>
+          </div>
+
+          <div class="category-strip" id="categoryStrip"></div>
+          <section class="id-hierarchy-filter" id="idHierarchyFilter" aria-label="고유번호 계층 필터">
+            <div class="id-hierarchy-head"><strong>고유번호 계층</strong><span id="idHierarchyPath">전체</span><button type="button" id="idHierarchyReset">계층만 초기화</button></div>
+            <div class="id-hierarchy-levels" id="idHierarchyLevels"></div>
+          </section>
+
+          <div class="bulk-bar" id="bulkBar">
+            <span><strong id="selectedCount">0</strong>개 선택</span>
+            <label>우선순위<select id="bulkPriority"><option value="">변경 안 함</option><option>높음</option><option>보통</option><option>낮음</option></select></label>
+            <label>상태<select id="bulkStatus"><option value="">변경 안 함</option><option>검토 전</option><option>검토 중</option><option>확정</option></select></label>
+            <label>플래그<select id="bulkFlag"><option value="">변경 안 함</option><option value="none">⚪ 없음</option><option value="red">🔴 빨강</option><option value="orange">🟠 주황</option><option value="yellow">🟡 노랑</option><option value="green">🟢 초록</option><option value="blue">🔵 파랑</option></select></label>
+            <button class="bulk-apply" id="bulkApply"><svg><use href="#i-check"></use></svg>일괄 적용</button>
+            <button class="danger" id="bulkDelete"><svg><use href="#i-trash"></use></svg>삭제</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th class="check-cell"><input type="checkbox" id="selectAll" aria-label="전체 선택"></th>
+                <th><button class="sort-button active" data-sort="id">고유번호 <span>↕</span></button></th>
+                <th><button class="sort-button" data-sort="name">요구사항 명칭 <span>↕</span></button></th>
+                <th><button class="sort-button" data-sort="category">분류 <span>↕</span></button></th>
+                <th>우선순위</th><th>상태</th><th><button class="sort-button" data-sort="flag">플래그 <span>↕</span></button></th>
+                <th><button class="sort-button" data-sort="confidence">신뢰도 <span>↕</span></button></th>
+                <th class="action-cell">관리</th>
+              </tr></thead>
+              <tbody id="requirementsBody"></tbody>
+            </table>
+          </div>
+          <div class="mobile-list" id="mobileList"></div>
+
+          <div class="empty-state" id="emptyState">
+            <div class="empty-illustration"><svg><use href="#i-upload"></use></svg></div>
+            <h3>RFP 문서에서 요구사항을 찾아드릴게요</h3>
+            <p>문서를 업로드하면 RFP에 실제로 적힌 요구사항 ID, 명칭, 상세 설명과 분류를 자동으로 정리합니다. ID가 없는 항목에는 번호를 임의로 만들지 않습니다.</p>
+            <div class="empty-actions"><button class="button primary" id="emptyUpload"><svg><use href="#i-upload"></use></svg>문서 업로드</button><button class="button ghost" id="emptySample">샘플로 둘러보기</button></div>
+            <span class="format-note">PDF · DOCX · PPTX · HWPX · XLSX · TXT · MD · CSV</span>
+          </div>
+
+          <footer class="table-footer"><p id="resultCount">총 0개</p><p>변경 내용은 이 브라우저의 전용 저장소에 자동 저장됩니다.</p></footer>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="detail-drawer" id="detailDrawer" aria-hidden="true">
+    <header class="drawer-header">
+      <div><p class="eyebrow">REQUIREMENT DETAIL</p><h2 id="drawerTitle">요구사항 편집</h2></div>
+      <button class="icon-button" id="drawerClose" aria-label="닫기"><svg><use href="#i-x"></use></svg></button>
+    </header>
+    <form id="requirementForm">
+      <div class="drawer-scroll">
+        <div class="source-panel">
+          <span class="confidence-ring" id="formConfidence">—</span>
+          <div><strong>자동 분류 근거</strong><p id="formSource">수동으로 추가된 요구사항입니다.</p></div>
+        </div>
+        <div class="form-row two-col">
+          <label><span>요구사항 ID</span><input id="formId" maxlength="60" placeholder="RFP에 적힌 ID를 그대로 입력 (예: UXG-DER-001)"><small class="field-error" id="idError"></small></label>
+          <label><span>분류 <em>*</em></span><select id="formCategory" required></select></label>
+        </div>
+        <label><span>요구사항 명칭 <em>*</em></span><input id="formName" required maxlength="120" placeholder="요구사항을 한 문장으로 요약하세요"><small><b id="nameCount">0</b>/120</small></label>
+        <label><span>상세 설명 <em>*</em></span><textarea id="formDescription" required rows="8" maxlength="3000" placeholder="요구사항의 조건, 기준, 예외 사항을 구체적으로 작성하세요."></textarea><small><b id="descriptionCount">0</b>/3000</small></label>
+        <section class="easy-explanation-panel collapsible-section collapsed" id="easyExplanationPanel">
+          <header class="collapsible-header"><div class="section-icon"><svg><use href="#i-spark"></use></svg></div><div><strong>쉽게 풀어보면</strong><p>RFP 원문과 연결된 관련 자료를 바탕으로, 실제로 무엇을 해야 하는지 쉬운 말로 정리합니다.</p></div><button type="button" class="section-toggle" id="toggleEasyExplanation" aria-expanded="false" aria-controls="easyExplanationBody" title="쉽게 풀어보면 열기">+</button></header>
+          <div class="collapsible-body" id="easyExplanationBody">
+            <div class="easy-explanation-request" id="easyExplanationRequest"><p>필요할 때만 한 항목씩 생성하므로 불필요한 토큰 사용을 줄일 수 있습니다.</p><button type="button" class="button primary" id="generateEasyExplanation"><svg><use href="#i-spark"></use></svg>쉬운 설명 요청</button></div>
+            <div class="easy-explanation-content" id="easyExplanationContent">
+              <textarea id="formEasyExplanation" rows="8" maxlength="12000" aria-label="요구사항 쉬운 설명"></textarea>
+              <div class="easy-explanation-counter"><b id="easyExplanationCount">0</b> / 12,000자</div>
+              <div class="easy-explanation-footer"><p class="easy-explanation-basis" id="easyExplanationBasis"></p><button type="button" class="button ghost" id="regenerateEasyExplanation">다시 생성</button></div>
+            </div>
+          </div>
+        </section>
+        <section class="glossary-helper collapsible-section collapsed" id="glossaryPanel">
+          <header class="collapsible-header"><div class="section-icon"><svg><use href="#i-book"></use></svg></div><div><strong>쉬운 용어 도우미</strong><p>약자뿐 아니라 일반인에게 생소한 업무·기술 용어를 찾고, 내장 사전에 없으면 외부 검색으로 보완합니다.</p></div><button type="button" class="section-toggle" id="toggleGlossary" aria-expanded="false" aria-controls="glossaryBody" title="쉬운 용어 도우미 열기">+</button></header>
+          <div class="collapsible-body" id="glossaryBody">
+            <div class="glossary-header-actions"><button type="button" class="glossary-detect-button" id="detectGlossaryButton"><svg><use href="#i-spark"></use></svg>용어 감지 요청</button><button type="button" class="glossary-add-button" id="manualGlossaryToggle"><svg><use href="#i-plus"></use></svg>용어 등록</button></div>
+            <div class="glossary-search">
+              <input id="glossarySearchInput" maxlength="120" aria-label="설명할 용어 직접 검색" placeholder="상세 설명의 단어나 문구를 복사해 붙여 넣으세요">
+              <button type="button" id="glossarySearchButton"><svg><use href="#i-search"></use></svg>쉬운 설명 찾기</button>
+            </div>
+            <p class="glossary-search-guide" id="glossarySearchGuide">궁금한 용어를 직접 검색하거나 ‘용어 감지 요청’을 눌러 주세요. 검색할 때는 용어만 외부에 전송되고 RFP 문맥은 로컬에서 사용합니다.</p>
+            <div class="manual-glossary-editor" id="manualGlossaryEditor">
+              <label><span>용어/약자 <em>*</em></span><input id="manualTerm" maxlength="60" placeholder="예: SDV"></label>
+              <label><span>영문 전체 이름</span><input id="manualFull" maxlength="140" placeholder="선택 입력"></label>
+              <label class="manual-meaning"><span>쉬운 뜻 <em>*</em></span><input id="manualMeaning" maxlength="300" placeholder="쉽게 이해할 수 있는 뜻을 입력하세요"></label>
+              <div><button type="button" class="button ghost" id="manualGlossaryCancel">취소</button><button type="button" class="button primary" id="manualGlossarySave">용어 저장</button></div>
+            </div>
+            <div class="term-chips" id="formGlossaryTerms"></div>
+            <div class="term-definition" id="termDefinition">
+              <div><span id="termAcronym">TERM</span><strong id="termName">용어를 선택해 주세요</strong></div>
+              <p id="termMeaning">문서에서 자동 감지된 전문용어의 약자와 의미를 제공합니다.</p>
+              <p class="term-context-note" id="termContextNote"></p>
+              <div class="term-candidates" id="termCandidates"></div>
+              <p class="term-source" id="termSource"></p>
+              <button type="button" class="term-remove" id="manualGlossaryRemove">직접 입력 용어 삭제</button>
+            </div>
+          </div>
+        </section>
+        <section class="relation-panel collapsible-section collapsed" id="relationPanel">
+          <header class="collapsible-header"><div class="relation-heading"><strong>관련·상충 요구사항</strong><span id="relationCount">0</span><p>내용이 비슷하거나 조건이 충돌할 가능성이 있는 항목을 자동으로 찾아 표시합니다.</p></div><button type="button" class="section-toggle" id="toggleRelations" aria-expanded="false" aria-controls="relationBody" title="관련·상충 요구사항 열기">+</button></header>
+          <div class="collapsible-body" id="relationBody"><div class="relation-list" id="relationList"></div></div>
+        </section>
+        <div class="form-row three-col">
+          <label><span>우선순위</span><select id="formPriority"><option>높음</option><option>보통</option><option>낮음</option></select></label>
+          <label><span>검토 상태</span><select id="formStatus"><option>검토 전</option><option>검토 중</option><option>확정</option></select></label>
+          <label><span>즐겨찾기 플래그</span><select id="formFlag"><option value="">없음</option><option value="red">🔴 빨강</option><option value="orange">🟠 주황</option><option value="yellow">🟡 노랑</option><option value="green">🟢 초록</option><option value="blue">🔵 파랑</option></select></label>
+        </div>
+        <div class="form-section-title"><span>이행 관리</span><i></i></div>
+        <div class="form-row two-col">
+          <label><span>수용 여부</span><select id="formAcceptance"><option>미검토</option><option>수용</option><option>조건부 수용</option><option>미수용</option></select></label>
+          <label><span>완료 여부</span><select id="formCompletion"><option>미완료</option><option>진행 중</option><option>완료</option></select></label>
+        </div>
+        <label><span>적용 방안</span><textarea id="formApplicationPlan" rows="3" maxlength="1000" placeholder="요구사항을 구현하거나 적용할 방안을 기록하세요."></textarea></label>
+        <div class="form-row two-col">
+          <label><span>담당자(소속)</span><input id="formOwner" maxlength="100" placeholder="예: 홍길동 (플랫폼팀)"></label>
+          <label><span>변경 이력</span><input id="formChangeHistory" maxlength="200" placeholder="예: v1.1 범위 조정"></label>
+        </div>
+        <section class="question-builder">
+          <header><div><span>질의사항</span><b id="formQuestionCount">0</b></div><p>자동 제안 질의를 추가하거나, 빈 항목에 직접 질의를 입력할 수 있습니다.</p></header>
+          <div class="question-actions"><button type="button" data-add-question="UI/UX"><svg><use href="#i-spark"></use></svg>UI/UX 관점 질의</button><button type="button" data-add-question="개발"><svg><use href="#i-spark"></use></svg>개발 관점 질의</button><button type="button" class="direct" id="addDirectQuestion"><svg><use href="#i-plus"></use></svg>직접 질의 입력</button></div>
+          <div class="question-list" id="formQuestionList"></div>
+        </section>
+        <label><span>태그</span><input id="formTags" placeholder="쉼표로 구분 (예: 로그인, 사용자)"><small>검색과 그룹화에 사용할 수 있습니다.</small></label>
+        <label><span>원문 위치</span><input id="formSourceInput" placeholder="예: 12페이지 · 3.2절"></label>
+      </div>
+      <footer class="drawer-footer">
+        <div><button type="button" class="button danger-ghost" id="deleteButton"><svg><use href="#i-trash"></use></svg>삭제</button><button type="button" class="button ghost" id="duplicateButton"><svg><use href="#i-copy"></use></svg>복제</button></div>
+        <div><button type="button" class="button ghost" id="cancelButton">취소</button><button type="submit" class="button primary"><svg><use href="#i-check"></use></svg>저장하기</button></div>
+      </footer>
+    </form>
+  </aside>
+
+  <div class="compare-overlay" id="relationCompareModal" aria-hidden="true">
+    <section class="compare-dialog" role="dialog" aria-modal="true" aria-labelledby="compareTitle">
+      <header class="compare-header">
+        <div><span class="compare-type" id="compareType">관련 요구사항</span><h2 id="compareTitle">요구사항 직접 비교</h2><p id="compareReason">두 요구사항의 차이를 확인하세요.</p>
+          <div class="compare-highlight-legend" id="compareHighlightLegend" aria-hidden="true"><span class="topic">공통으로 다루는 대상</span><span class="conflict">서로 맞지 않는 조건</span></div>
+        </div>
+        <button type="button" class="icon-button" id="compareClose" aria-label="비교 창 닫기"><svg><use href="#i-x"></use></svg></button>
+      </header>
+      <div class="compare-body">
+        <article class="compare-card current" id="compareCurrentCard"></article>
+        <div class="compare-divider" aria-hidden="true"><span>VS</span></div>
+        <article class="compare-card target" id="compareTargetCard"></article>
+      </div>
+      <footer class="compare-footer"><p>자동 감지 결과는 검토 보조 정보입니다. 실제 상충 여부는 원문과 발주기관의 의도를 함께 확인해 주세요.</p><button type="button" class="button primary" id="compareDone">비교 닫기</button></footer>
+    </section>
+  </div>
+
+  <div class="analysis-overlay" id="analysisOverlay" aria-live="polite">
+    <div class="analysis-card">
+      <div class="agent-animation"><div class="orbit"></div><svg><use href="#i-spark"></use></svg></div>
+      <p class="eyebrow">REQly DOCUMENT AGENT</p><h2 id="analysisTitle">문서를 읽고 있습니다</h2><p id="analysisSubtitle">파일 구조와 텍스트를 안전하게 확인하는 중입니다.</p>
+      <div class="analysis-progress"><span id="analysisProgress"></span></div>
+      <div class="analysis-steps">
+        <span class="active"><i></i>문서 읽기</span><span><i></i>요구사항 추출</span><span><i></i>자동 분류</span><span><i></i>결과 정리</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script src="./pages-runtime.js?v=4.0.2"></script>
+  <script src="./app.js?v=4.0.2"></script>
+</body>
+</html>
