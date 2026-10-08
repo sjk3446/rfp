@@ -16,6 +16,7 @@
   const now = () => new Date().toISOString();
   const uid = () => `project-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const clean = value => String(value ?? '').replace(/\s+/g, ' ').trim();
+  const parser = window.ReqlyDocumentParser;
   const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 
   function openDatabase() {
@@ -183,7 +184,8 @@
     if (helperToken) headers.set('X-Reqly-Token', helperToken);
     const requestOptions = {...options, headers};
     try { requestOptions.targetAddressSpace = 'loopback'; } catch (_) {}
-    return nativeFetch(`${HELPER_URL}${path}`, requestOptions);
+    try { return await nativeFetch(`${HELPER_URL}${path}`, requestOptions); }
+    catch (_) { throw new Error('AI 도우미에 연결할 수 없습니다. 다운로드한 도우미를 실행하고, ‘AI 연결’에서 연결 상태와 브라우저의 로컬 네트워크 접근 허용 여부를 확인해 주세요.'); }
   }
 
   async function helperJson(path, options = {}) {
@@ -207,7 +209,7 @@
     const dot = modal.querySelector('[data-helper-dot]');
     const setStatus = (text, on=false) => { status.textContent=text; dot.classList.toggle('on',on); };
     const test = async () => {
-      try { const data=await helperJson('/health'); setStatus(data.hasKey ? '도우미 연결됨 · 암호화된 API 키 있음' : '도우미 연결됨 · API 키 없음', true); }
+      try { const data=await helperJson('/health'); setStatus(!data.paired ? '도우미 실행 중 · 아래 6자리 코드로 연결해 주세요.' : !data.hasKey ? '도우미 연결됨 · API 키를 저장해 주세요.' : data.explanationVersion !== 2 ? '도우미 업데이트 필요 · 최신 ZIP을 받아 다시 실행해 주세요.' : 'AI 사용 준비 완료 · 암호화된 API 키 있음', Boolean(data.paired && data.hasKey && data.explanationVersion === 2)); }
       catch (_) { setStatus('도우미가 꺼져 있거나 브라우저의 로컬 네트워크 권한이 필요합니다.'); }
     };
     document.getElementById('aiSettingsButton')?.addEventListener('click', () => { modal.classList.add('open'); test(); });
@@ -245,25 +247,19 @@
   const hkey = value => clean(value).toLowerCase().replace(/[\s_\-./()]/g,'');
   function matchHeader(value){const key=hkey(value);if(!key)return null;for(const [field,aliases] of Object.entries(HEADER_ALIASES)){if(aliases.includes(key))return field;}let best=null;for(const [field,aliases] of Object.entries(HEADER_ALIASES)){for(const alias of aliases){if(alias.length>=3&&(key.includes(alias)||alias.includes(key))&&(!best||alias.length>best.length))best={field,length:alias.length};}}return best?.field||null;}
 
-  const ID_RE = /(?<![A-Z0-9])(?:(?:요구\s*사항\s*(?:ID|번호|No\.?|고유\s*번호)|요건\s*(?:ID|번호)|REQ(?:UIREMENT)?\s*(?:ID|NO\.?)|ID)\s*[:：#-]?\s*)?((?:[A-Z가-힣][A-Z0-9가-힣]{0,19}(?:\s*[-_./]\s*[A-Z0-9가-힣]{1,20}){0,5}\s*[-_./]\s*\d{1,6})|(?:[A-Z가-힣]{2,15}\d{2,6}))(?![A-Z0-9])/i;
   const OBLIGATION_RE=/(하여야\s*한다|해야\s*한다|하여야\s*하며|해야\s*하며|필수|반드시|제공한다|제공해야|구축한다|구축해야|지원한다|지원해야|준수한다|준수해야|보장한다|보장해야|가능해야|관리한다|관리해야|처리한다|처리해야|수행한다|수행해야|적용한다|적용해야|한다\.?$)/i;
   const SOFT_RE=/(할\s*것|해야\s*함|하여야\s*함|필요(?:하다|함|하며)|요구(?:된다|함|한다)|(?:제공|지원|구현|적용|정의|확보|유지|연계|관리|처리|수행|준수|보장|구성|포함|제출|설치|운영|저장|전송|표시|검증|기록)(?:한다|함|해야|하여야|할\s*것|되어야)|(?:가능|허용|금지|제한)(?:해야|하여야|하다|함|된다))/i;
-  const BULLET_RE=/^\s*(?:[-•▪◦●○※]|\d+[.)]|[가-힣][.)])\s*/;
   const CATEGORY_RULES=[['보안',/(보안|인증|권한|암호|취약|접근통제|개인정보|로그인)/i],['인터페이스',/(인터페이스|연계|API|통신|프로토콜|메시지)/i],['데이터',/(데이터|DB|데이터베이스|백업|이관|저장|메타데이터)/i],['성능',/(성능|응답시간|처리량|동시|TPS|가용성)/i],['품질',/(품질|테스트|검증|결함|감리|표준)/i],['운영',/(운영|모니터링|장애|유지보수|교육|매뉴얼)/i],['제약사항',/(제약|준수|법률|법령|규정|라이선스|환경)/i],['시스템장비',/(장비|서버|스토리지|네트워크|하드웨어|단말)/i],['기능',/.*/]];
-  function classify(text){return CATEGORY_RULES.find(([,re])=>re.test(text))?.[0]||'기타';}
+  function classify(text){
+    const explicit=[['프로젝트관리',/프로젝트\s*관리/],['프로젝트지원',/프로젝트\s*지원/],['아키텍처',/아키텍처/],['테스트',/^테스트\s*(?:요구사항|요건)?$/]];
+    return explicit.find(([,re])=>re.test(text))?.[0]||CATEGORY_RULES.find(([,re])=>re.test(text))?.[0]||'기타';
+  }
   function priority(text){return /(필수|반드시|중요|핵심|긴급)/i.test(text)?'높음':/(선택|권고|가능하면)/i.test(text)?'낮음':'보통';}
-  function idFrom(text){const m=String(text).match(ID_RE);if(!m)return'';const id=clean(m[1]).replace(/\s*([-_./])\s*/g,'$1');return /^(AES|SHA|RSA|TLS|HTTP|HTTPS|IPV|ISO|IEC)[-_./]?\d/i.test(id)?'':id;}
-  function titleFrom(text,id=''){let value=clean(text).replace(BULLET_RE,'');if(id)value=value.replace(id,'').replace(/^[\s|:：_./-]+/,'');value=value.split('|')[0].trim();return value.length>90?`${value.slice(0,87)}…`:value||'요구사항';}
-  function requirement(base,index){const text=clean(base.description||base.text);const id=clean(base.id||idFrom(text));return {key:`req-${index}`,sourceOrder:index,id,name:clean(base.name)||titleFrom(text,id),description:text,category:clean(base.category)||classify(`${base.name||''} ${text} ${id}`),priority:['높음','보통','낮음'].includes(base.priority)?base.priority:priority(text),status:['검토 전','검토 중','확정'].includes(base.status)?base.status:'검토 전',confidence:id?90:65,source:base.source||'브라우저 분석',section:base.section||'본문',basis:id?'명시 ID':(base.basis||'문장 분석'),tags:[],acceptance:base.acceptance||'미검토',applicationPlan:base.applicationPlan||'',owner:base.owner||'',changeHistory:base.changeHistory||'',completion:base.completion||'미완료',easyExplanation:'',explanationSources:[],questions:[],manualGlossary:[],flag:''};}
+  function titleFrom(text,id=''){return parser.titleFrom(text,id);}
+  function requirement(base,index){const text=parser.multiline(base.description||base.text);const id=clean(base.id);const category=clean(base.category);return {key:`req-${index}`,sourceOrder:index,id,name:clean(base.name)||titleFrom(text,id),description:text,category:category?classify(category):classify(`${base.name||''} ${text} ${id}`),priority:['높음','보통','낮음'].includes(base.priority)?base.priority:priority(text),status:['검토 전','검토 중','확정'].includes(base.status)?base.status:'검토 전',confidence:id?90:65,source:base.source||'브라우저 분석',section:base.section||'본문',basis:base.basis||(id?'명시 ID':'문장 분석'),tags:[],acceptance:base.acceptance||'미검토',applicationPlan:base.applicationPlan||'',owner:base.owner||'',changeHistory:base.changeHistory||'',completion:base.completion||'미완료',easyExplanation:'',explanationSources:[],questions:[],manualGlossary:[],flag:''};}
 
   function buildTextRequirements(text){
-    const raw=String(text||'').replace(/\r/g,'\n').split(/\n+/).map(clean).filter(Boolean);const candidates=[];let page=1,sheet='',row=0,current=null;
-    const flush=()=>{if(current){current.text=clean(current.parts.join(' '));delete current.parts;candidates.push(current);current=null;}};
-    for(const line of raw){let m=line.match(/^\[\[PAGE:(\d+)]]$/);if(m){flush();page=Number(m[1]);continue;}m=line.match(/^\[\[SHEET:(.+)]]$/);if(m){flush();sheet=m[1];continue;}m=line.match(/^\[\[ROW:(\d+)]]$/);if(m){row=Number(m[1]);continue;}
-      const parts=(line.length>40&&!line.includes('|'))?line.split(/(?<=[.!?])\s+(?=[A-Z가-힣0-9•▪◦●○※-])/):[line];
-      for(const part0 of parts){const part=clean(part0);const id=idFrom(part);const signal=OBLIGATION_RE.test(part)||SOFT_RE.test(part)||(BULLET_RE.test(part)&&part.length>=12)||(part.includes('|')&&part.split('|').length>=4);if(id||signal){flush();current={parts:[part],id,source:sheet?`${sheet} 시트 · ${row||1}행`:`${page}페이지`,section:sheet||'본문',basis:id?'명시 ID':'목록·서술 분석'};}else if(current&&current.parts.join(' ').length<1200){current.parts.push(part);}}
-    }flush();
-    if(!candidates.length)raw.filter(line=>line.length>=15).forEach(line=>candidates.push({text:line,source:'본문',basis:'문장 분석'}));
+    const candidates=parser.buildTextRequirements(text,{obligation:OBLIGATION_RE,soft:SOFT_RE});
     const result=[],seen=new Map();for(const item of candidates){const req=requirement(item,result.length+1);if(req.id&&seen.has(req.id.toLowerCase())){const idx=seen.get(req.id.toLowerCase());if(req.description.length>result[idx].description.length){req.key=result[idx].key;req.sourceOrder=result[idx].sourceOrder;result[idx]=req;}continue;}if(req.id)seen.set(req.id.toLowerCase(),result.length);result.push(req);}return result.slice(0,5000);
   }
 
@@ -271,7 +267,7 @@
     if(!window.XLSX)throw new Error('Excel 분석 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.');
     const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const structured=[];const fallback=[];
     for(const sheetName of workbook.SheetNames){const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:'',raw:false});let headerIndex=-1,map={};for(let i=0;i<Math.min(rows.length,80);i++){const found={};rows[i].forEach((cell,col)=>{const field=matchHeader(cell);if(field&&!Object.hasOwn(found,field))found[field]=col;});if((found.name!==undefined||found.description!==undefined)&&(found.id!==undefined||(found.name!==undefined&&found.description!==undefined))){headerIndex=i;map=found;break;}}
-      if(headerIndex>=0){const carried={level1:'',level2:'',level3:'',level4:'',category:''};for(let i=headerIndex+1;i<rows.length;i++){const values={};for(const [field,col] of Object.entries(map))values[field]=clean(rows[i][col]);for(const field of Object.keys(carried)){if(values[field])carried[field]=values[field];else values[field]=carried[field];}if(!values.name&&!values.description)continue;structured.push({...values,description:values.description||values.name,section:[values.level1,values.level2,values.level3,values.level4].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' > ')||sheetName,source:`${sheetName} 시트 · ${i+1}행`});}}
+      if(headerIndex>=0){const carried={level1:'',level2:'',level3:'',level4:'',category:''};for(let i=headerIndex+1;i<rows.length;i++){const values={};for(const [field,col] of Object.entries(map))values[field]=['description','applicationPlan','changeHistory'].includes(field)?parser.multiline(rows[i][col]):clean(rows[i][col]);for(const field of Object.keys(carried)){if(values[field])carried[field]=values[field];else values[field]=carried[field];}if(!values.name&&!values.description)continue;structured.push({...values,description:values.description||values.name,section:[values.level1,values.level2,values.level3,values.level4].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' > ')||sheetName,source:`${sheetName} 시트 · ${i+1}행`});}}
       else {for(let i=0;i<rows.length;i++){const cells=rows[i].map(clean).filter(Boolean);if(cells.length)fallback.push(`[[SHEET:${sheetName}]]\n[[ROW:${i+1}]]\n${cells.join(' | ')}`);}}
     }
     const source=structured.length?structured.map((row,i)=>requirement(row,i+1)):buildTextRequirements(fallback.join('\n'));
@@ -288,7 +284,23 @@
   async function extractFile(file){
     const ext=file.name.split('.').pop().toLowerCase();
     if(['xlsx','xlsm','xls','csv','tsv'].includes(ext))return extractExcel(file);
-    if(ext==='pdf'){if(!window.pdfjsLib)throw new Error('PDF 분석 도구를 불러오지 못했습니다.');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;const pages=[];for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i);const content=await page.getTextContent();pages.push(`[[PAGE:${i}]]\n${content.items.map(x=>x.str).join(' ')}`);}return{text:pages.join('\n'),pages:pdf.numPages};}
+    if(ext==='pdf'){
+      if(!window.pdfjsLib)throw new Error('PDF 분석 도구를 불러오지 못했습니다.');
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+      const count=pdf.numPages, pages=[];
+      let previousLayout=null;
+      try {
+        for(let i=1;i<=count;i++){
+          const page=await pdf.getPage(i), content=await page.getTextContent();
+          const layout=parser.pdfPageText(content.items,previousLayout);
+          previousLayout=layout;
+          pages.push(`[[PAGE:${i}]]\n${layout.tableLayout?'[[TABLE_LAYOUT]]\n':''}${layout.text}`);
+          page.cleanup();
+        }
+      } finally {await pdf.destroy();}
+      return{text:pages.join('\n'),pages:count};
+    }
     if(ext==='docx'){if(!window.mammoth)throw new Error('Word 분석 도구를 불러오지 못했습니다.');const out=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});return{text:out.value,pages:1};}
     if(ext==='pptx'||ext==='hwpx')return extractZipXml(file,ext);
     if(ext==='hwp')throw new Error('구형 HWP는 브라우저에서 직접 읽을 수 없습니다. HWPX, PDF 또는 DOCX로 저장한 뒤 올려 주세요.');
@@ -296,10 +308,15 @@
   }
 
   function jsonResponse(payload,status=200){return new Response(JSON.stringify(payload),{status,headers:{'Content-Type':'application/json;charset=utf-8'}});}
-  function simpleExplanation(req, references=[]){const points=clean(req.description).split(/(?<=[.!?다함])\s+|[;•]/).map(clean).filter(Boolean).slice(0,7);const lines=[`이 요구사항은 ‘${req.name}’을 실제 시스템이나 업무에 반영하라는 뜻입니다.`,`쉽게 말하면 다음 내용을 확인하고 구현해야 합니다.`,'',...points.map((p,i)=>`${i+1}. ${p}`),'',`완료 판단: 구현 결과가 원문의 조건을 빠짐없이 충족하는지 시험하고 근거를 남겨야 합니다.`];if(references.length)lines.push('',`함께 올린 참고자료: ${references.slice(0,3).map(r=>r.name).join(', ')} (AI 연결 시 관련 문맥을 선별해 반영할 수 있습니다.)`);return lines.join('\n');}
 
   async function aiGenerate(task,payload){
     if(!helperToken)throw new Error('AI 보안 연결이 필요합니다. 화면 위쪽의 ‘AI 연결’에서 로컬 도우미와 연결해 주세요.');
+    if(task === 'explain') {
+      const health = await helperJson('/health');
+      if(!health.paired) throw new Error('AI 연결이 만료되었습니다. ‘AI 연결’에서 도우미의 6자리 코드를 다시 입력해 주세요.');
+      if(!health.hasKey) throw new Error('API 키가 없습니다. ‘AI 연결’에서 본인의 API 키를 저장해 주세요.');
+      if(health.explanationVersion !== 2) throw new Error('AI 도우미 업데이트가 필요합니다. ‘AI 연결’에서 최신 ZIP을 받아 압축을 풀고, 기존 도우미를 종료한 뒤 새 도우미를 실행해 주세요.');
+    }
     return helperJson('/v1/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task,...payload})});
   }
 
@@ -308,7 +325,17 @@
     try{
       if(path.endsWith('/api/analyze')){const file=options.body;const extracted=await extractFile(file);const requirements=extracted.requirements||buildTextRequirements(extracted.text);if(!requirements.length)throw new Error('요구사항으로 판단할 문장을 찾지 못했습니다. 표의 머리글이나 요구 문장을 확인해 주세요.');return jsonResponse({document:{name:file.name,type:file.name.split('.').pop().toUpperCase(),size:file.size,pages:extracted.pages||1,characters:extracted.text.length},requirements});}
       if(path.endsWith('/api/enrich')){const files=options.body.getAll('references');const references=[];for(const file of files){const out=await extractFile(file);references.push({name:file.name,type:file.name.split('.').pop().toUpperCase(),size:file.size,pages:out.pages||1,characters:out.text.length,text:out.text.slice(0,250000)});}return jsonResponse({references});}
-      if(path.endsWith('/api/explain')){const body=JSON.parse(options.body||'{}');const project=await dbGet(body.projectId);const refs=project?.workspace?.references||[];try{const result=await aiGenerate('explain',{requirement:body.requirement,references:refs.map(r=>({name:r.name,text:String(r.text||'').slice(0,8000)}))});return jsonResponse({easyExplanation:result.text||'',explanationSources:result.sources||[]});}catch(error){if(/연결|도우미|API 키/.test(error.message))return jsonResponse({easyExplanation:simpleExplanation(body.requirement,refs),explanationSources:[],localFallback:true});throw error;}}
+      if(path.endsWith('/api/explain')) {
+        const body=JSON.parse(options.body||'{}');
+        const project=await dbGet(body.projectId);
+        const req=body.requirement||{};
+        const result=await aiGenerate('explain',{
+          requirement:{id:req.id,name:req.name,category:req.category,description:req.description},
+          references:(project?.workspace?.references||[]).slice(0,5).map(r=>({name:r.name,text:String(r.text||'').slice(0,8000)}))
+        });
+        if(!String(result.text||'').trim()) throw new Error('AI가 빈 설명을 반환했습니다. 기존 설명은 변경하지 않았습니다.');
+        return jsonResponse({easyExplanation:result.text,explanationSources:result.sources||[]});
+      }
       if(path.endsWith('/api/glossary')){const body=JSON.parse(options.body||'{}');try{const result=await aiGenerate('glossary',{terms:body.terms,context:String(body.context||'').slice(0,10000)});return jsonResponse({results:result.results||[]});}catch(_){const results=[];for(const term of (body.terms||[]).slice(0,10)){try{const api=`https://ko.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json&origin=*`;const data=await nativeFetch(api).then(r=>r.json());const pages=Object.values(data.query?.pages||{}).sort((a,b)=>(a.index||0)-(b.index||0));results.push({term,candidates:pages.map((p,i)=>({full:p.title,meaning:clean(p.extract).slice(0,650)||'설명이 없습니다.',source:'위키백과',sourceUrl:p.fullurl,score:100-i}))});}catch(_e){results.push({term,candidates:[]});}}return jsonResponse({results});}}
       if(path.endsWith('/api/export-questions')){if(!window.XLSX)throw new Error('Excel 생성 도구를 불러오지 못했습니다.');const body=JSON.parse(options.body||'{}');const rows=[['RFP 원문 순서','요구사항 ID','요구사항 명칭','분류','관점','질의사항','답변']];for(const req of body.requirements||[])for(const q of req.questions||[])rows.push([req.sourceOrder,req.id,req.name,req.category,q.perspective,q.question,q.answer]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'질의응답');const data=XLSX.write(wb,{type:'array',bookType:'xlsx'});return new Response(data,{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}});}
       return jsonResponse({error:'지원하지 않는 로컬 API입니다.'},404);

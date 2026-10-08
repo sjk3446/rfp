@@ -1,5 +1,6 @@
 const CATEGORIES = [
   { name: '설계', code: 'DER', prefix: 'DER' },
+  { name: '아키텍처', code: 'ARC', prefix: 'ARC' },
   { name: '기능', code: 'SFR', prefix: 'SFR' },
   { name: '성능', code: 'PER', prefix: 'PER' },
   { name: '시스템장비', code: 'ECR', prefix: 'ECR' },
@@ -1148,9 +1149,12 @@ function renderEasyExplanation() {
   const hasExplanation = Boolean(elements.formEasyExplanation.value.trim());
   elements.easyExplanationRequest.style.display = hasExplanation ? 'none' : '';
   elements.easyExplanationContent.classList.toggle('visible', hasExplanation);
-  elements.easyExplanationBasis.textContent = state.draftExplanationSources.length
+  const legacySummary = elements.formEasyExplanation.value.includes('쉽게 말하면 다음 내용을 확인하고 구현해야 합니다.');
+  elements.easyExplanationBasis.textContent = legacySummary
+    ? '기존 원문 재정리 결과입니다. 실제 쉬운 해설은 ‘AI로 다시 설명’을 눌러 요청해 주세요.'
+    : state.draftExplanationSources.length
     ? `관련 자료 반영: ${state.draftExplanationSources.join(', ')}`
-    : 'RFP 원문을 기준으로 생성했습니다. 필요하면 직접 수정하거나 다시 생성할 수 있습니다.';
+    : '저장된 설명입니다. 직접 수정하거나 AI로 다시 설명할 수 있습니다. 해설은 원문과 대조해 확인해 주세요.';
   requestAnimationFrame(resizeEasyExplanation);
 }
 
@@ -1168,20 +1172,28 @@ async function requestEasyExplanation() {
   const originalRegenerateText = elements.regenerateEasyExplanation.textContent;
   elements.generateEasyExplanation.textContent = '설명 생성 중…';
   elements.regenerateEasyExplanation.textContent = '생성 중…';
+  const requestedProject = state.projectId;
+  const requestedKey = state.editingKey;
+  const feedback = document.getElementById('easyExplanationFeedback');
+  feedback.textContent = 'AI가 원문을 해석하고 있습니다. 완료될 때까지 잠시 기다려 주세요.';
   try {
     const previous = state.requirements.find(item => item.key === state.editingKey);
     const response = await fetch('/api/explain', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         projectId: state.projectId,
-        requirement: { ...(previous || {}), id: elements.formId.value.trim(), name, description, category: elements.formCategory.value },
+        requirement: { id: elements.formId.value.trim(), name, description, category: elements.formCategory.value },
       }),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || '쉬운 설명을 생성할 수 없습니다.');
+    if (!String(payload.easyExplanation || '').trim()) throw new Error('AI가 빈 설명을 반환했습니다. 기존 설명은 유지됩니다.');
+    // A slow AI response must never populate a different requirement's editor.
+    if (state.projectId !== requestedProject || state.editingKey !== requestedKey) return;
     elements.formEasyExplanation.value = payload.easyExplanation || '';
     state.draftExplanationSources = Array.isArray(payload.explanationSources) ? payload.explanationSources : [];
     renderEasyExplanation();
+    feedback.textContent = 'AI 해설을 생성했습니다. 원문에 없는 예시는 이해를 돕기 위한 것이며 추가 요구사항이 아닙니다.';
     if (previous) {
       state.requirements = state.requirements.map(item => item.key === previous.key ? normalizeRequirement({
         ...item, easyExplanation: elements.formEasyExplanation.value, explanationSources: state.draftExplanationSources,
@@ -1189,8 +1201,10 @@ async function requestEasyExplanation() {
       saveWorkspace();
     }
     const contextCopy = state.draftExplanationSources.length ? `${state.draftExplanationSources.length}개 관련 자료도 반영했습니다.` : 'RFP 원문을 기준으로 정리했습니다.';
-    showToast('쉬운 설명을 생성했습니다', contextCopy);
+    showToast('AI 쉬운 설명을 생성했습니다', contextCopy);
   } catch (error) {
+    if (state.projectId !== requestedProject || state.editingKey !== requestedKey) return;
+    feedback.textContent = error.message;
     showToast('쉬운 설명 생성에 실패했습니다', error.message, true);
   } finally {
     buttons.forEach(button => { button.disabled = false; });
@@ -1363,6 +1377,7 @@ function openDrawer(key = null) {
   state.draftQuestions = (item.questions || []).map(question => ({ ...question }));
   state.draftGlossary = (item.manualGlossary || []).map(entry => ({ ...entry, manual: true }));
   state.draftExplanationSources = [...(item.explanationSources || [])];
+  document.getElementById('easyExplanationFeedback').textContent = '';
   elements.drawerTitle.textContent = key ? '요구사항 편집' : '새 요구사항 추가';
   elements.formConfidence.textContent = key ? `${item.confidence}%` : '직접';
   elements.formSource.textContent = key ? `${item.source} · ${item.basis}` : '수동으로 추가하는 요구사항입니다.';
@@ -1698,6 +1713,7 @@ function bindEvents() {
   elements.manualGlossarySave.addEventListener('click', saveManualGlossaryTerm);
   elements.manualGlossaryRemove.addEventListener('click', removeManualGlossaryTerm);
   elements.generateEasyExplanation.addEventListener('click', requestEasyExplanation);
+  document.getElementById('connectExplanationAi').addEventListener('click', () => document.getElementById('aiSettingsButton')?.click());
   elements.regenerateEasyExplanation.addEventListener('click', requestEasyExplanation);
   elements.toggleEasyExplanation.addEventListener('click', () => setDetailSectionExpanded('easy', elements.easyExplanationPanel.classList.contains('collapsed')));
   elements.toggleGlossary.addEventListener('click', () => setDetailSectionExpanded('glossary', elements.glossaryPanel.classList.contains('collapsed')));
