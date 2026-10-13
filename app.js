@@ -911,11 +911,11 @@ function externalGlossaryEntry(result) {
   if (!candidates.length) return null;
   const first = candidates[0];
   return {
-    term: result.term, full: first.full, meaning: first.meaning, external: true, contextual: true,
+    term: result.term, full: first.full, meaning: first.meaning, external: true, contextual: true, ai: /AI/.test(first.source || ''),
     contextResolved: candidates.length === 1,
     contextNote: candidates.length > 1
       ? '검색 결과와 RFP 문맥만으로 하나를 확정하기 어려워 가능성이 높은 뜻을 순서대로 표시합니다.'
-      : '내장 사전에 없어 외부 검색 결과로 보완했습니다.',
+      : /AI/.test(first.source || '') ? 'AI가 현재 요구사항 문맥을 참고해 용어의 뜻을 설명했습니다. 웹 검색 결과는 아닙니다.' : '내장 사전에 없어 외부 검색 결과로 보완했습니다.',
     alternatives: candidates,
     source: first.source,
     sourceUrl: first.sourceUrl,
@@ -957,7 +957,7 @@ function showGlossaryTerm(entry) {
   elements.termCandidates.innerHTML = showCandidates ? `<ol>${alternatives.map(glossaryCandidateMarkup).join('')}</ol>` : '';
   elements.termCandidates.classList.toggle('visible', showCandidates);
   elements.termSource.innerHTML = !showCandidates && entry.sourceUrl
-    ? `<a href="${escapeHtml(entry.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.source || '검색 출처')}에서 확인</a>` : '';
+    ? `<a href="${escapeHtml(entry.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.source || '검색 출처')}에서 확인</a>` : !showCandidates && entry.ai ? escapeHtml(entry.source || 'AI 문맥 해석') : '';
   elements.termSource.style.display = elements.termSource.innerHTML ? 'block' : 'none';
   elements.termDefinition.dataset.contextResolved = entry.contextResolved ? 'true' : 'false';
   elements.termDefinition.dataset.external = entry.external ? 'true' : 'false';
@@ -999,6 +999,7 @@ async function searchGlossaryTerm() {
     return;
   }
   const source = `${elements.formName.value} ${elements.formDescription.value} ${elements.formApplicationPlan.value}`;
+  let lookupError = '';
   let entry = lookupGlossaryTerm(query, source);
   const originalText = elements.glossarySearchButton.innerHTML;
   if (!entry) {
@@ -1008,7 +1009,7 @@ async function searchGlossaryTerm() {
     try {
       [entry] = await fetchExternalGlossary([query], source);
     } catch (error) {
-      elements.glossarySearchGuide.textContent = `외부 검색을 사용할 수 없어 문맥 감지 결과만 표시합니다. (${error.message})`;
+      lookupError = error.message;
     } finally {
       elements.glossarySearchButton.disabled = false;
       elements.glossarySearchButton.innerHTML = originalText;
@@ -1017,10 +1018,14 @@ async function searchGlossaryTerm() {
   entry ||= contextualGlossaryEntry(query, source);
   if (!state.visibleGlossary.some(item => item.term.toLowerCase() === entry.term.toLowerCase())) state.visibleGlossary.push(entry);
   showGlossaryTerm(entry);
+  if (lookupError) {
+    elements.glossarySearchGuide.textContent = `용어 설명 요청에 실패했습니다. ${lookupError}`;
+    return;
+  }
   elements.glossarySearchGuide.textContent = entry.external
     ? entry.alternatives?.length > 1
-      ? `‘${entry.term}’의 뜻을 하나로 확정하기 어려워 외부 검색 후보 ${entry.alternatives.length}개를 표시했습니다.`
-      : `‘${entry.term}’을(를) 외부 검색으로 보완했습니다.`
+      ? `‘${entry.term}’의 뜻을 하나로 확정하기 어려워 ${entry.ai ? 'AI 해석' : '외부 검색'} 후보 ${entry.alternatives.length}개를 표시했습니다.`
+      : `‘${entry.term}’을(를) ${entry.ai ? 'AI 문맥 해석' : '외부 검색'}으로 보완했습니다.`
     : entry.contextual
       ? '내장 사전과 문맥만으로 실제 뜻을 특정할 수 없어 확인 필요로 표시했습니다.'
       : entry.alternatives?.length > 1
@@ -1035,6 +1040,7 @@ async function requestGlossaryDetection() {
   const source = `${elements.formName.value} ${elements.formDescription.value} ${elements.formApplicationPlan.value}`;
   const unknownTerms = state.visibleGlossary.filter(entry => entry.contextual && !entry.manual).map(entry => entry.term).slice(0, 10);
   const originalText = elements.detectGlossaryButton.innerHTML;
+  let lookupError = '';
   if (unknownTerms.length) {
     elements.detectGlossaryButton.disabled = true;
     elements.detectGlossaryButton.textContent = '검색 보완 중…';
@@ -1043,7 +1049,7 @@ async function requestGlossaryDetection() {
       state.remoteGlossary = await fetchExternalGlossary(unknownTerms, source);
       renderGlossary();
     } catch (error) {
-      elements.glossarySearchGuide.textContent = `내장 사전 감지는 완료했지만 외부 검색을 사용할 수 없습니다. (${error.message})`;
+      lookupError = error.message;
     } finally {
       elements.detectGlossaryButton.disabled = false;
       elements.detectGlossaryButton.innerHTML = originalText;
@@ -1051,8 +1057,13 @@ async function requestGlossaryDetection() {
   }
   const count = state.visibleGlossary.filter(entry => !entry.manual).length;
   const remoteCount = state.visibleGlossary.filter(entry => entry.external).length;
+  if (lookupError) {
+    elements.glossarySearchGuide.textContent = `내장 사전 감지는 완료했지만 용어 설명 요청에 실패했습니다. ${lookupError}`;
+    showToast('AI·외부 용어 설명에 실패했습니다', lookupError, true);
+    return;
+  }
   elements.glossarySearchGuide.textContent = count
-    ? `일반인에게 생소할 수 있는 용어 ${count}개를 감지했습니다.${remoteCount ? ` 이 중 ${remoteCount}개는 외부 검색으로 보완했습니다.` : ''} 용어를 선택하면 뜻 후보를 확인할 수 있습니다.`
+    ? `일반인에게 생소할 수 있는 용어 ${count}개를 감지했습니다.${remoteCount ? ` 이 중 ${remoteCount}개는 AI·외부 자료로 보완했습니다.` : ''} 용어를 선택하면 뜻 후보를 확인할 수 있습니다.`
     : '감지된 용어가 없습니다. 궁금한 단어나 약자를 직접 검색해 주세요.';
   showToast('용어 감지를 완료했습니다', count ? `${count}개 용어 후보를 찾았습니다.${remoteCount ? ` 검색 보완 ${remoteCount}개.` : ''}` : '자동 감지 후보가 없습니다.');
 }

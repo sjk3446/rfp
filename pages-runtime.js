@@ -201,37 +201,86 @@
       <p class="privacy-warning">AI 기능을 사용할 때에만 선택한 요구사항 내용이 로컬 도우미를 거쳐 AI 제공사로 전송됩니다. RFP 파일 전체는 자동 전송되지 않습니다.</p>
       <p class="pages-note">처음 사용하는 PC라면 <a class="pages-action" href="./local-helper/Reqly-AI-도우미.zip" download>AI 도우미 다운로드</a> 후 압축을 풀고 <b>Reqly-AI-도우미.bat</b>를 실행하세요.</p>
       <label class="pages-field"><span>도우미 창에 표시된 6자리 연결 번호</span><div class="helper-grid"><input data-pair-code inputmode="numeric" maxlength="6" placeholder="예: 123456"><button class="pages-action primary" data-pair>연결</button></div></label>
-      <label class="pages-field"><span>OpenAI API 키</span><input data-api-key type="password" autocomplete="off" placeholder="sk-로 시작하는 API 키"></label>
-      <label class="pages-field"><span>사용 모델</span><select data-model><option value="gpt-5-mini">gpt-5-mini (권장·절약형)</option><option value="gpt-5">gpt-5</option></select></label>
-      <div class="pages-footer-actions"><button class="pages-action primary" data-save-key>Windows 암호화 저장</button><button class="pages-action" data-delete-key>저장된 키 삭제</button><button class="pages-action" data-test-helper>상태 확인</button></div>
+      <label class="pages-field"><span>사용할 AI</span><select data-provider><option value="gemini">Google Gemini</option><option value="openai">OpenAI GPT</option></select></label>
+      <label class="pages-field"><span>사용 모델</span><select data-model></select></label>
+      <p class="pages-note" data-provider-note></p>
+      <label class="pages-field"><span data-key-label>Gemini API 키</span><input data-api-key type="password" autocomplete="off" placeholder="Google AI Studio에서 발급받은 API 키"></label>
+      <p class="pages-note" data-saved-key-note>선택한 AI의 키를 입력해 저장해 주세요.</p>
+      <div class="pages-footer-actions"><button class="pages-action primary" data-save-key>암호화 저장 / 적용</button><button class="pages-action" data-delete-key>선택한 AI 키 삭제</button><button class="pages-action" data-test-helper>상태 확인</button></div>
     `);
+    const providers = {
+      gemini: {label:'Gemini',models:[['gemini-3.1-flash-lite','Gemini 3.1 Flash-Lite (기본·절약형)'],['gemini-3.8-flash','Gemini 3.8 Flash (상세 해설용)']]},
+      openai: {label:'GPT',models:[['gpt-5-mini','gpt-5-mini (절약형)'],['gpt-5','gpt-5']]}
+    };
+    const providerSelect = modal.querySelector('[data-provider]');
+    const modelSelect = modal.querySelector('[data-model]');
+    const keyInput = modal.querySelector('[data-api-key]');
+    let lastHealth = null;
+    let selectionDirty = false;
+    const renderSelection = model => {
+      const provider = providerSelect.value;
+      const info = providers[provider];
+      modelSelect.innerHTML = info.models.map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
+      if(info.models.some(([value])=>value===model)) modelSelect.value=model;
+      modal.querySelector('[data-key-label]').textContent = `${provider === 'gemini' ? 'Gemini' : 'OpenAI'} API 키`;
+      keyInput.placeholder = provider === 'gemini' ? 'Google AI Studio에서 발급받은 API 키' : 'sk-로 시작하는 OpenAI API 키';
+      modal.querySelector('[data-provider-note]').innerHTML = provider === 'gemini'
+        ? '무료 한도를 지원하는 모델입니다. 실제 무료 여부와 한도는 Google 프로젝트의 결제 설정에 따릅니다. 무료 이용 시 입력 내용이 Google 제품 개선에 사용될 수 있습니다. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Gemini API 키 발급</a> · <a href="https://ai.google.dev/gemini-api/docs/pricing?hl=ko" target="_blank" rel="noopener noreferrer">요금 확인</a>'
+        : 'GPT API는 ChatGPT 구독과 별도로 과금됩니다. 기존 GPT 키는 Gemini 키와 따로 보관합니다.';
+      modal.querySelector('[data-saved-key-note]').textContent = lastHealth?.savedKeys?.[provider]
+        ? `${info.label} 키가 이 PC에 암호화되어 있습니다. 키를 비워 두고 ‘암호화 저장 / 적용’을 누르면 기존 키로 이 AI와 모델을 사용합니다.`
+        : `${info.label} 키를 입력하고 ‘암호화 저장 / 적용’을 눌러 주세요. 키를 저장할 때 AI를 호출하지는 않습니다.`;
+    };
+    renderSelection();
     const status = modal.querySelector('[data-helper-status]');
     const dot = modal.querySelector('[data-helper-dot]');
     const setStatus = (text, on=false) => { status.textContent=text; dot.classList.toggle('on',on); };
     const test = async () => {
-      try { const data=await helperJson('/health'); setStatus(!data.paired ? '도우미 실행 중 · 아래 6자리 코드로 연결해 주세요.' : !data.hasKey ? '도우미 연결됨 · API 키를 저장해 주세요.' : data.explanationVersion !== 2 ? '도우미 업데이트 필요 · 최신 ZIP을 받아 다시 실행해 주세요.' : 'AI 사용 준비 완료 · 암호화된 API 키 있음', Boolean(data.paired && data.hasKey && data.explanationVersion === 2)); }
+      try {
+        const data=await helperJson('/health');
+        lastHealth=data;
+        const updated=data.providerVersion===1 && data.explanationVersion===2;
+        if(!selectionDirty && providers[data.provider]) providerSelect.value=data.provider;
+        renderSelection(selectionDirty ? modelSelect.value : data.model);
+        const label=providers[data.provider]?.label || 'AI';
+        setStatus(!updated ? 'Gemini 지원 도우미 업데이트 필요 · 최신 ZIP을 받아 다시 실행해 주세요.' : !data.paired ? '도우미 실행 중 · 아래 6자리 코드로 연결해 주세요.' : !data.hasKey ? `${label} API 키가 없습니다. 아래에서 AI를 선택하고 저장해 주세요.` : `현재 사용 AI: ${label} · ${data.model} · 암호화된 키 저장됨`, Boolean(updated && data.paired && data.hasKey));
+      }
       catch (_) { setStatus('도우미가 꺼져 있거나 브라우저의 로컬 네트워크 권한이 필요합니다.'); }
     };
+    providerSelect.addEventListener('change', () => {
+      selectionDirty=true;
+      keyInput.value='';
+      renderSelection(lastHealth?.models?.[providerSelect.value]);
+      setStatus('AI와 모델을 선택한 뒤 ‘암호화 저장 / 적용’을 눌러 주세요.');
+    });
+    modelSelect.addEventListener('change', () => { selectionDirty=true; setStatus('새 모델은 ‘암호화 저장 / 적용’을 누른 뒤 사용됩니다.'); });
     document.getElementById('aiSettingsButton')?.addEventListener('click', () => { modal.classList.add('open'); test(); });
     modal.querySelector('[data-test-helper]').addEventListener('click', test);
     modal.querySelector('[data-pair]').addEventListener('click', async () => {
       try {
         const code=modal.querySelector('[data-pair-code]').value.trim();
         const data=await helperJson('/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
-        helperToken=data.token; sessionStorage.setItem('reqly-helper-token',helperToken); setStatus('보안 연결 완료',true);
+        helperToken=data.token; sessionStorage.setItem('reqly-helper-token',helperToken); await test();
       } catch(error) { setStatus(error.message); }
     });
     modal.querySelector('[data-save-key]').addEventListener('click', async () => {
       try {
-        const apiKey=modal.querySelector('[data-api-key]').value.trim(); const model=modal.querySelector('[data-model]').value;
-        if(!apiKey) throw new Error('API 키를 입력하세요.');
-        await helperJson('/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey,model})});
-        modal.querySelector('[data-api-key]').value=''; setStatus('Windows 계정으로 암호화하여 저장했습니다.',true);
+        const apiKey=keyInput.value.trim(); const model=modelSelect.value; const provider=providerSelect.value;
+        const data=await helperJson('/health');
+        if(data.providerVersion!==1) throw new Error('Gemini 지원 도우미가 필요합니다. 최신 ZIP을 받아 기존 도우미를 종료하고 다시 실행해 주세요.');
+        if(!apiKey && !data.savedKeys?.[provider]) throw new Error(`${providers[provider].label} API 키를 입력하세요.`);
+        await helperJson('/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey,model,provider})});
+        keyInput.value=''; selectionDirty=false; await test();
       } catch(error) { setStatus(error.message); }
     });
     modal.querySelector('[data-delete-key]').addEventListener('click', async () => {
-      if(!confirm('이 PC에 암호화되어 저장된 API 키를 삭제할까요?')) return;
-      try { await helperJson('/key',{method:'DELETE'}); setStatus('저장된 API 키를 삭제했습니다.',true); } catch(error){ setStatus(error.message); }
+      const provider=providerSelect.value;
+      if(!confirm(`이 PC에 저장된 ${providers[provider].label} API 키를 삭제할까요? 다른 AI의 키는 유지됩니다.`)) return;
+      try {
+        const data=await helperJson('/health');
+        if(data.providerVersion!==1) throw new Error('최신 도우미를 다운로드해 다시 실행한 뒤 키를 삭제해 주세요.');
+        await helperJson(`/key?provider=${provider}`,{method:'DELETE'}); keyInput.value=''; await test();
+      } catch(error){ setStatus(error.message); }
     });
   }
 
@@ -311,11 +360,11 @@
 
   async function aiGenerate(task,payload){
     if(!helperToken)throw new Error('AI 보안 연결이 필요합니다. 화면 위쪽의 ‘AI 연결’에서 로컬 도우미와 연결해 주세요.');
-    if(task === 'explain') {
+    {
       const health = await helperJson('/health');
       if(!health.paired) throw new Error('AI 연결이 만료되었습니다. ‘AI 연결’에서 도우미의 6자리 코드를 다시 입력해 주세요.');
-      if(!health.hasKey) throw new Error('API 키가 없습니다. ‘AI 연결’에서 본인의 API 키를 저장해 주세요.');
-      if(health.explanationVersion !== 2) throw new Error('AI 도우미 업데이트가 필요합니다. ‘AI 연결’에서 최신 ZIP을 받아 압축을 풀고, 기존 도우미를 종료한 뒤 새 도우미를 실행해 주세요.');
+      if(health.providerVersion!==1 || health.explanationVersion!==2) throw new Error('AI 도우미 업데이트가 필요합니다. ‘AI 연결’에서 최신 ZIP을 받아 압축을 풀고, 기존 도우미를 종료한 뒤 새 도우미를 실행해 주세요.');
+      if(!health.hasKey) throw new Error('API 키가 없습니다. ‘AI 연결’에서 사용할 AI를 선택하고 본인의 API 키를 저장해 주세요.');
     }
     return helperJson('/v1/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task,...payload})});
   }
@@ -336,7 +385,7 @@
         if(!String(result.text||'').trim()) throw new Error('AI가 빈 설명을 반환했습니다. 기존 설명은 변경하지 않았습니다.');
         return jsonResponse({easyExplanation:result.text,explanationSources:result.sources||[]});
       }
-      if(path.endsWith('/api/glossary')){const body=JSON.parse(options.body||'{}');try{const result=await aiGenerate('glossary',{terms:body.terms,context:String(body.context||'').slice(0,10000)});return jsonResponse({results:result.results||[]});}catch(_){const results=[];for(const term of (body.terms||[]).slice(0,10)){try{const api=`https://ko.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json&origin=*`;const data=await nativeFetch(api).then(r=>r.json());const pages=Object.values(data.query?.pages||{}).sort((a,b)=>(a.index||0)-(b.index||0));results.push({term,candidates:pages.map((p,i)=>({full:p.title,meaning:clean(p.extract).slice(0,650)||'설명이 없습니다.',source:'위키백과',sourceUrl:p.fullurl,score:100-i}))});}catch(_e){results.push({term,candidates:[]});}}return jsonResponse({results});}}
+      if(path.endsWith('/api/glossary')){const body=JSON.parse(options.body||'{}');try{const result=await aiGenerate('glossary',{terms:body.terms,context:String(body.context||'').slice(0,10000)});return jsonResponse({results:result.results||[]});}catch(error){if(helperToken)throw error;const results=[];for(const term of (body.terms||[]).slice(0,10)){try{const api=`https://ko.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json&origin=*`;const data=await nativeFetch(api).then(r=>r.json());const pages=Object.values(data.query?.pages||{}).sort((a,b)=>(a.index||0)-(b.index||0));results.push({term,candidates:pages.map((p,i)=>({full:p.title,meaning:clean(p.extract).slice(0,650)||'설명이 없습니다.',source:'위키백과',sourceUrl:p.fullurl,score:100-i}))});}catch(_e){results.push({term,candidates:[]});}}return jsonResponse({results});}}
       if(path.endsWith('/api/export-questions')){if(!window.XLSX)throw new Error('Excel 생성 도구를 불러오지 못했습니다.');const body=JSON.parse(options.body||'{}');const rows=[['RFP 원문 순서','요구사항 ID','요구사항 명칭','분류','관점','질의사항','답변']];for(const req of body.requirements||[])for(const q of req.questions||[])rows.push([req.sourceOrder,req.id,req.name,req.category,q.perspective,q.question,q.answer]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'질의응답');const data=XLSX.write(wb,{type:'array',bookType:'xlsx'});return new Response(data,{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}});}
       return jsonResponse({error:'지원하지 않는 로컬 API입니다.'},404);
     }catch(error){return jsonResponse({error:error.message||String(error)},400);}

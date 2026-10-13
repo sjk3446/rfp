@@ -17,7 +17,7 @@ class ExplanationTests(unittest.TestCase):
     def test_prompt_teaches_actions_instead_of_repeating_source(self):
         payload = {"requirement": {"id": "DAR-009", "name": "이행", "description": "자료 정합성 검증", "easyExplanation": "old"},
                    "references": [{"name": f"자료{i}", "text": "가" * 9000} for i in range(6)]}
-        with patch.object(helper, "call_openai", return_value="해설\n참고한 자료: 자료0") as call:
+        with patch.object(helper, "call_ai", return_value="해설\n참고한 자료: 자료0") as call:
             result = helper.make_easy_explanation(payload)
         instructions, prompt = call.call_args.args
         for section in ("한마디로", "실제로 해야 할 일", "예를 들면", "완료됐는지", "확인이 필요한 점", "추가 의무가 아닙니다"):
@@ -49,7 +49,7 @@ class ExplanationTests(unittest.TestCase):
             self.run_response({"status": "completed", "output": []})
 
     def test_oversize_explanation_is_not_truncated(self):
-        with patch.object(helper, "call_openai", return_value="가" * 12001), self.assertRaisesRegex(RuntimeError, "최대 길이"):
+        with patch.object(helper, "call_ai", return_value="가" * 12001), self.assertRaisesRegex(RuntimeError, "최대 길이"):
             helper.make_easy_explanation({})
 
     def test_download_bundle_matches_source(self):

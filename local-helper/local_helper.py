@@ -17,6 +17,7 @@ import secrets
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -25,13 +26,18 @@ HOST = "127.0.0.1"
 PORT = 8766
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Reqly"
 KEY_FILE = DATA_DIR / "api-key.dpapi"
+GEMINI_KEY_FILE = DATA_DIR / "gemini-api-key.dpapi"
 CONFIG_FILE = DATA_DIR / "settings.json"
 PAIR_CODE = f"{secrets.randbelow(1_000_000):06d}"
 SESSION_TOKEN = secrets.token_urlsafe(32)
 PAIRED_ORIGIN = ""
 FAILED_PAIR_ATTEMPTS: list[float] = []
 MAX_BODY = 2 * 1024 * 1024
-ALLOWED_MODELS = {"gpt-5-mini", "gpt-5"}
+PROVIDER_MODELS = {
+    "gemini": ("gemini-3.1-flash-lite", "gemini-3.8-flash"),
+    "openai": ("gpt-5-mini", "gpt-5"),
+}
+KEY_FILES = {"openai": KEY_FILE, "gemini": GEMINI_KEY_FILE}
 
 
 class DATA_BLOB(ctypes.Structure):
@@ -90,28 +96,62 @@ def unprotect(data: bytes) -> bytes:
         kernel32.LocalFree(ctypes.cast(result.pbData, wintypes.HLOCAL))
 
 
-def save_key(api_key: str, model: str) -> None:
-    if not api_key or len(api_key) < 20:
+def load_settings() -> dict:
+    try:
+        raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raw = {}
+    except (OSError, ValueError):
+        raw = {}
+    # The old settings file has only a GPT model; retain its existing key.
+    default_provider = "openai" if KEY_FILE.exists() or str(raw.get("model", "")).startswith("gpt-") else "gemini"
+    provider = raw.get("provider", default_provider)
+    if provider not in PROVIDER_MODELS:
+        provider = default_provider
+    saved_models = raw.get("models", {})
+    if not isinstance(saved_models, dict):
+        saved_models = {}
+    models = {name: saved_models.get(name) if saved_models.get(name) in allowed else allowed[0]
+              for name, allowed in PROVIDER_MODELS.items()}
+    if raw.get("model") in PROVIDER_MODELS[provider]:
+        models[provider] = raw["model"]
+    return {"provider": provider, "model": models[provider], "models": models}
+
+
+def provider_key_file(provider: str) -> Path:
+    if provider not in KEY_FILES:
+        raise ValueError("지원하지 않는 AI 제공사입니다.")
+    return KEY_FILES[provider]
+
+
+def save_key(api_key: str, model: str, provider: str = "openai") -> None:
+    key_file = provider_key_file(provider)
+    if model not in PROVIDER_MODELS[provider]:
+        raise ValueError("선택한 AI 제공사와 모델이 일치하지 않습니다.")
+    if api_key and len(api_key) < 20:
         raise ValueError("API 키 형식이 올바르지 않습니다.")
-    if model not in ALLOWED_MODELS:
-        raise ValueError("허용되지 않은 AI 모델입니다.")
+    if not api_key and not key_file.exists():
+        raise ValueError("선택한 AI의 API 키를 먼저 입력해 주세요.")
+    settings = load_settings()
+    settings["provider"] = provider
+    settings["model"] = model
+    settings["models"][provider] = model
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    KEY_FILE.write_bytes(base64.b64encode(protect(api_key.encode("utf-8"))))
-    CONFIG_FILE.write_text(json.dumps({"model": model or "gpt-5-mini"}), encoding="utf-8")
+    if api_key:
+        key_file.write_bytes(base64.b64encode(protect(api_key.encode("utf-8"))))
+    CONFIG_FILE.write_text(json.dumps(settings), encoding="utf-8")
 
 
-def load_key() -> str:
-    if not KEY_FILE.exists():
-        raise RuntimeError("저장된 API 키가 없습니다. 웹 화면의 ‘AI 연결’에서 먼저 저장하세요.")
-    return unprotect(base64.b64decode(KEY_FILE.read_bytes())).decode("utf-8")
+def load_key(provider: str = "openai") -> str:
+    key_file = provider_key_file(provider)
+    if not key_file.exists():
+        label = "Gemini" if provider == "gemini" else "GPT"
+        raise RuntimeError(f"저장된 {label} API 키가 없습니다. 웹 화면의 ‘AI 연결’에서 먼저 저장하세요.")
+    return unprotect(base64.b64decode(key_file.read_bytes())).decode("utf-8")
 
 
 def load_model() -> str:
-    try:
-        model = json.loads(CONFIG_FILE.read_text(encoding="utf-8")).get("model", "gpt-5-mini")
-        return model if model in ALLOWED_MODELS else "gpt-5-mini"
-    except (OSError, ValueError):
-        return "gpt-5-mini"
+    return load_settings()["model"]
 
 
 def allowed_origin(origin: str) -> bool:
@@ -132,10 +172,10 @@ def output_text(response: dict) -> str:
     return "\n".join(parts)
 
 
-def call_openai(instructions: str, user_input: str) -> str:
+def call_openai(instructions: str, user_input: str, model: str | None = None) -> str:
     request_body = json.dumps(
         {
-            "model": load_model(),
+            "model": model or load_model(),
             "instructions": instructions,
             "input": user_input,
             # Reqly는 단발성 설명만 요청하므로 응답을 API에 보관할 필요가 없다.
@@ -175,6 +215,75 @@ def call_openai(instructions: str, user_input: str) -> str:
     return text
 
 
+def call_gemini(instructions: str, user_input: str, model: str, expect_json: bool = False) -> str:
+    if model not in PROVIDER_MODELS["gemini"]:
+        raise ValueError("허용되지 않은 Gemini 모델입니다.")
+    api_key = load_key("gemini")
+    config = {
+        "maxOutputTokens": 6000,
+        "thinkingConfig": {"thinkingLevel": "low"},
+    }
+    if expect_json:
+        config["responseMimeType"] = "application/json"
+    body = json.dumps({
+        "systemInstruction": {"parts": [{"text": instructions}]},
+        "contents": [{"role": "user", "parts": [{"text": user_input}]}],
+        "generationConfig": config,
+        "store": False,
+    }, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+        data=body,
+        headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        if error.code == 429:
+            raise RuntimeError("Gemini 요청 한도에 도달했습니다. 무료 일일 한도 또는 분당 한도를 Google AI Studio에서 확인하고, 한도가 다시 열릴 때 요청해 주세요. GPT로 자동 전환하지 않습니다.") from error
+        if error.code in (401, 403):
+            raise RuntimeError("Gemini API 키 또는 접근 권한을 확인해 주세요. Google AI Studio에서 발급한 키와 Gemini API 사용 권한이 필요합니다.") from error
+        if error.code == 404:
+            raise RuntimeError("이 Google 프로젝트에서 선택한 Gemini 모델을 사용할 수 없습니다. ‘AI 연결’에서 다른 Gemini 모델을 선택해 저장해 주세요.") from error
+        raise RuntimeError(f"Gemini 요청에 실패했습니다 (오류 {error.code}). 잠시 후 다시 요청해 주세요.") from error
+    except (urllib.error.URLError, TimeoutError) as error:
+        raise RuntimeError("Gemini 응답을 받지 못했습니다. 인터넷 연결을 확인한 뒤 다시 요청해 주세요.") from error
+    if result.get("error"):
+        raise RuntimeError("Gemini 요청을 완료하지 못했습니다. 기존 설명은 유지됩니다.")
+    candidates = result.get("candidates") or []
+    if not candidates:
+        raise RuntimeError("Gemini가 답변을 반환하지 않았습니다. 요청 내용이나 제공사의 차단 여부를 확인해 주세요.")
+    candidate = candidates[0]
+    reason = candidate.get("finishReason")
+    if reason == "MAX_TOKENS":
+        raise RuntimeError("Gemini 설명이 끝까지 생성되지 않았습니다. 잘린 설명은 저장하지 않았습니다. 필요하면 다시 요청해 주세요.")
+    if reason != "STOP":
+        raise RuntimeError("Gemini가 답변 생성을 완료하지 못했습니다. 기존 설명은 유지됩니다.")
+    text = "\n".join(str(part["text"]) for part in candidate.get("content", {}).get("parts", [])
+                     if part.get("text") and not part.get("thought")).strip()
+    if not text:
+        raise RuntimeError("Gemini가 빈 답변을 반환했습니다.")
+    return text
+
+
+def call_ai(instructions: str, user_input: str, expect_json: bool = False) -> str:
+    settings = load_settings()
+    if settings["provider"] == "gemini":
+        return call_gemini(instructions, user_input, settings["model"], expect_json)
+    return call_openai(instructions, user_input, settings["model"])
+
+
+def helper_status(paired: bool) -> dict:
+    settings = load_settings()
+    saved_keys = {provider: provider_key_file(provider).exists() for provider in PROVIDER_MODELS}
+    return {"ok": True, "hasKey": saved_keys[settings["provider"]], "paired": paired,
+            "explanationVersion": 2, "providerVersion": 1, "providers": list(PROVIDER_MODELS),
+            "provider": settings["provider"], "model": settings["model"],
+            "models": settings["models"], "savedKeys": saved_keys}
+
+
 def make_easy_explanation(payload: dict) -> dict:
     requirement = payload.get("requirement") or {}
     references = payload.get("references") or []
@@ -206,7 +315,7 @@ def make_easy_explanation(payload: dict) -> dict:
         "불필요한 서론 없이 보통 800~2,000자 정도로 쓰되 복잡한 요구사항은 조건을 빠뜨리지 않게 늘리세요. "
         "최대 12,000자 이내로 완결하세요."
     )
-    text = call_openai(instructions, prompt)
+    text = call_ai(instructions, prompt)
     if len(text) > 12000:
         raise RuntimeError("AI 설명이 편집란의 최대 길이를 초과했습니다. 기존 설명을 유지했습니다. 다시 요청해 주세요.")
     used = [item["name"] for item in selected_references if item["name"] and item["name"] in text]
@@ -221,7 +330,7 @@ def make_glossary(payload: dict) -> dict:
         "문맥은 용어 뜻을 고르는 데만 사용하고 문장 전체를 요약하지 마세요. 뜻이 하나로 특정되지 않으면 가능성이 높은 순서로 최대 3개를 제시하세요. "
         "반드시 JSON만 반환하세요. 형식: {\"results\":[{\"term\":\"...\",\"candidates\":[{\"full\":\"정식명칭\",\"meaning\":\"쉬운 뜻\",\"source\":\"AI 문맥 해석\",\"sourceUrl\":\"\",\"score\":95}]}]}"
     )
-    raw = call_openai(instructions, json.dumps({"terms": terms, "context": context}, ensure_ascii=False))
+    raw = call_ai(instructions, json.dumps({"terms": terms, "context": context}, ensure_ascii=False), expect_json=True)
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.I)
     try:
         result = json.loads(raw)
@@ -289,7 +398,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_origin():
             return
         if self.path == "/health":
-            self._send(200, {"ok": True, "hasKey": KEY_FILE.exists(), "paired": self._authorized(), "explanationVersion": 2})
+            self._send(200, helper_status(self._authorized()))
         else:
             self._send(404, {"error": "주소를 찾을 수 없습니다."})
 
@@ -320,7 +429,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(401, {"error": "먼저 6자리 연결 번호로 도우미를 연결하세요."})
                 return
             if self.path == "/key":
-                save_key(str(payload.get("apiKey", "")).strip(), str(payload.get("model", "gpt-5-mini")))
+                save_key(str(payload.get("apiKey", "")).strip(), str(payload.get("model", "gpt-5-mini")), str(payload.get("provider", "openai")))
                 self._send(200, {"ok": True})
             elif self.path == "/v1/generate":
                 task = payload.get("task")
@@ -339,10 +448,14 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authorized():
             self._send(401, {"error": "먼저 도우미를 연결하세요."})
             return
-        if self.path == "/key":
-            KEY_FILE.unlink(missing_ok=True)
-            CONFIG_FILE.unlink(missing_ok=True)
-            self._send(200, {"ok": True})
+        parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/key":
+            try:
+                provider = urllib.parse.parse_qs(parsed.query).get("provider", [load_settings()["provider"]])[0]
+                provider_key_file(provider).unlink(missing_ok=True)
+                self._send(200, {"ok": True})
+            except ValueError as error:
+                self._send(400, {"error": str(error)})
         else:
             self._send(404, {"error": "주소를 찾을 수 없습니다."})
 

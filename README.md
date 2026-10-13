@@ -48,8 +48,10 @@ AI를 쓰지 않으면 이 절차는 생략해도 됩니다.
 3. 검은 창에 표시되는 6자리 연결 번호를 확인합니다.
 4. Reqly 화면 위쪽의 `AI 연결`을 누릅니다.
 5. 6자리 번호를 입력하고 `연결`을 누릅니다.
-6. 본인의 OpenAI API 키를 입력하고 `Windows 암호화 저장`을 누릅니다.
-7. 도우미 창은 AI를 사용하는 동안 열어 둡니다.
+6. `사용할 AI`에서 **Google Gemini** 또는 **OpenAI GPT**를 선택하고 모델을 고릅니다. Gemini의 기본 모델은 `gemini-3.1-flash-lite`, 상세 해설용 모델은 `gemini-3.8-flash`입니다.
+7. Gemini를 사용할 경우 [Google AI Studio의 API 키 화면](https://aistudio.google.com/apikey)에서 본인의 키를 발급받아 입력하고 `암호화 저장 / 적용`을 누릅니다. GPT는 본인의 OpenAI 키를 입력합니다.
+8. 해당 AI의 키가 이미 저장되어 있다면 입력란을 비운 상태로 `암호화 저장 / 적용`을 눌러 AI나 모델만 변경할 수 있습니다.
+9. 도우미 창은 AI를 사용하는 동안 열어 둡니다.
 
 저장 흐름은 다음과 같습니다.
 
@@ -57,10 +59,16 @@ AI를 쓰지 않으면 이 절차는 생략해도 됩니다.
 브라우저에서 API 키 입력
   → 내 PC의 127.0.0.1:8766 로컬 Python 도우미로 전달
   → Windows DPAPI가 현재 Windows 사용자 계정에 묶어 암호화
-  → %LOCALAPPDATA%\Reqly\api-key.dpapi 에 암호문만 저장
+  → GPT: %LOCALAPPDATA%\Reqly\api-key.dpapi
+  → Gemini: %LOCALAPPDATA%\Reqly\gemini-api-key.dpapi
+  → 각각의 파일에 암호문만 저장
 ```
 
-브라우저에는 API 키를 저장하지 않습니다. 도우미는 실행할 때마다 새 6자리 연결 번호를 만들며, 연결 권한은 브라우저 탭을 닫거나 도우미를 종료하면 사라집니다. AI 요청 시에는 현재 요청한 요구사항과 직접 관련된 참고 문맥만 AI 제공사로 전송됩니다. 요청은 단발성으로 보내며 API의 응답 저장 옵션도 끈 상태(`store: false`)입니다. 다만 AI 제공사의 보안·오남용 방지 보존 정책까지 없애는 기능은 아닙니다.
+브라우저에는 API 키를 저장하지 않습니다. Gemini와 GPT 키는 따로 보관하므로 AI를 바꾸어도 기존 키를 덮어쓰지 않습니다. `선택한 AI 키 삭제`는 선택한 제공사의 키만 삭제합니다. 기존 GPT 설정과 암호화된 키도 유지됩니다.
+
+도우미는 실행할 때마다 새 6자리 연결 번호를 만들며, 연결 권한은 브라우저 탭을 닫거나 도우미를 종료하면 사라집니다. AI 요청 시에는 현재 요청한 요구사항과 참고자료의 발췌만 선택한 AI 제공사로 전송됩니다. 요청은 단발성으로 보내며 API의 응답 저장 옵션도 끈 상태(`store: false`)입니다. 다만 AI 제공사의 데이터 이용·보존 정책까지 없애는 기능은 아닙니다.
+
+Gemini 두 모델은 무료 한도를 지원하지만, 실제 무료 여부는 Google 프로젝트의 결제 설정과 제공사의 정책에 따릅니다. 앱에서는 해당 프로젝트가 무료인지 조회할 수 없습니다. 무료 이용 시 입력 내용과 응답이 Google 제품 개선에 사용될 수 있으므로 공개 자료에 맞게 사용하세요. 한도 초과 시에는 안내를 표시하고 요청을 종료하며, GPT나 다른 모델로 자동 전환하거나 자동 재시도하지 않습니다. [Gemini 요금](https://ai.google.dev/gemini-api/docs/pricing) · [데이터 이용 약관](https://ai.google.dev/gemini-api/terms)
 
 Python이 없다면 [Python Windows 설치 페이지](https://www.python.org/downloads/windows/)에서 Python 3을 설치하면서 `Add Python to PATH`를 선택하세요. 추가 패키지는 필요 없습니다.
 
