@@ -19,7 +19,7 @@ test('overview batches cover all document pages including content after requirem
   const units=core.batches(text).flat();
   assert.ok(units.length>2);assert.ok(units.some(unit=>unit.page===3&&unit.text.includes('15:00')));
   assert.equal(units.filter(unit=>unit.page===2).map(unit=>unit.text).join(''),'요구사항 본문 '.repeat(5000).trim());
-  for(const batch of core.batches(text))assert.ok(batch.reduce((sum,unit)=>sum+unit.text.length,0)<=24000);
+  for(const batch of core.batches(text))assert.ok(batch.reduce((sum,unit)=>sum+unit.text.length,0)<=8000);
 });
 
 test('overview handles multiple sheets and never invents physical pages for plain text',()=>{
@@ -107,4 +107,52 @@ test('requirement extraction and classification do not call AI or the native net
   const file=new File(['요구사항 ID: SER-001\n요구사항 명칭: 개인정보 암호화\n상세 설명: 개인정보를 암호화하여야 한다.'],'rfp.txt');
   const response=await context.window.fetch('/api/analyze',{body:file});const result=await response.json();
   assert.equal(response.status,200);assert.equal(result.requirements[0].id,'SER-001');assert.equal(result.requirements[0].category,'보안');assert.equal(calls,0);
+});
+
+test('adaptive splitting preserves all source characters, IDs and physical locations',()=>{
+  const original=core.batches('[[PAGE:12]]\n'+'사업 조건 문장\n'.repeat(500)+'[[PAGE:13]]\n'+'다음 페이지\n'.repeat(300),24000)[0];
+  const split=core.splitBatch(original),units=split.flat();
+  assert.equal(units.map(unit=>unit.text).join(''),original.map(unit=>unit.text).join(''));
+  assert.equal(new Set(units.map(unit=>unit.sourceId)).size,units.length);
+  assert.ok(units.some(unit=>unit.page===12));assert.ok(units.some(unit=>unit.page===13));
+});
+
+test('output-limit recovery retries only split portions and keeps progress stable',async()=>{
+  const batches=core.batches('[[PAGE:1]]\n'+'가'.repeat(8000)+'[[PAGE:2]]\n'+'나'.repeat(8000));
+  const completed={items:[],rejected:0},data={batches,results:[completed]},calls=[],events=[];
+  let lastProgress=core.progress(data);
+  await core.analyze(data,{
+    request:async units=>{calls.push(units);if(units.reduce((sum,u)=>sum+u.text.length,0)>4000)throw Object.assign(new Error('limit'),{code:'OUTPUT_LIMIT'});return{items:[]};},
+    onEvent:event=>{events.push(event.type);assert.ok(core.progress(data)>=lastProgress);lastProgress=core.progress(data);}
+  });
+  assert.equal(data.results[0],completed);assert.equal(calls.length,3);assert.equal(data.splitCount,1);
+  assert.ok(calls.every(units=>units.every(u=>u.page===2)));assert.equal(core.progress(data),100);
+  assert.equal(events.filter(event=>event==='split').length,1);
+});
+
+test('persistent truncation has bounded retries and never declares a partial result complete',async()=>{
+  const data={batches:core.batches('가'.repeat(8000)),results:[]};let calls=0;
+  await assert.rejects(()=>core.analyze(data,{request:async()=>{calls++;throw Object.assign(new Error('limit'),{code:'OUTPUT_LIMIT'});}}),{code:'OUTPUT_LIMIT'});
+  assert.equal(calls,4);assert.equal(core.progress(data),0);assert.ok(data.batches.length<=4);
+});
+
+test('quota/auth/policy errors do not split or automatically retry, and resume skips completed work',async()=>{
+  for(const code of ['QUOTA','AUTH','REFUSAL','AI_CANCELLED']){
+    const data={batches:core.batches('가'.repeat(16000)),results:[{items:[],rejected:0}]};let calls=0;
+    await assert.rejects(()=>core.analyze(data,{request:async()=>{calls++;throw Object.assign(new Error('failure'),{code});}}),{code});
+    assert.equal(calls,1);assert.equal(data.batches.length,2);assert.equal(core.progress(data),50);
+    await core.analyze(data,{request:async()=>{calls++;return{items:[]};}});
+    assert.equal(calls,2);assert.equal(core.progress(data),100);
+  }
+});
+
+test('stopping between split requests retains completed portions for resume',async()=>{
+  const data={batches:core.batches('가'.repeat(8000)),results:[]};let stopped=false,calls=0;
+  await assert.rejects(()=>core.analyze(data,{
+    request:async units=>{calls++;if(units[0].text.length>4000)throw Object.assign(new Error('timeout'),{code:'AI_TIMEOUT'});return{items:[]};},
+    shouldStop:()=>stopped,onEvent:event=>{if(event.type==='completed')stopped=true;}
+  }),/중단/);
+  assert.equal(calls,2);assert.equal(core.progress(data),50);
+  await core.analyze(data,{request:async()=>{calls++;return{items:[]};}});
+  assert.equal(calls,3);assert.equal(core.progress(data),100);
 });

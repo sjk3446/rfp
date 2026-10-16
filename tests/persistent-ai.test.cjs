@@ -14,7 +14,7 @@ test('connection persists after a new browser context without storing plaintext 
 test('explicit disconnect persists and prevents any AI request',async()=>{const b=browser();await b.api.connect('gemini','gemini-3.1-flash-lite','dummy');await b.api.disconnect();assert.equal(await browser(b.records).api.isConnected(),false);await assert.rejects(()=>b.api.generate('explain',{}),/연결/);assert.equal(b.calls.length,0);});
 test('quota failure does not retry or switch providers',async()=>{const b=browser(new Map(),async()=>({ok:false,status:429,json:async()=>({})}));await b.api.connect('gemini','gemini-3.1-flash-lite','dummy');await assert.rejects(()=>b.api.generate('explain',{}),/한도/);assert.equal(b.calls.length,1);});
 test('glossary uses term definitions and caps alternatives at three',async()=>{const b=browser(new Map(),async()=>({ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({results:[{term:'off-boarding',candidates:Array.from({length:5},()=>({meaning:'퇴사·서비스 이용 종료 절차'}))},{term:'unrequested',candidates:[]}]})}]}}]})}));await b.api.connect('gemini','gemini-3.1-flash-lite','dummy');const result=await b.api.generate('glossary',{terms:['off-boarding'],context:'project'});assert.equal(result.results.length,1);assert.equal(result.results[0].candidates.length,3);assert.equal(result.results[0].candidates[0].source,'AI 문맥 해석');assert.match(JSON.parse(b.calls[0].options.body).systemInstruction.parts[0].text,/용어 자체의 뜻/);});
-test('truncated AI output is not applied',async()=>{const b=browser(new Map(),async()=>({ok:true,json:async()=>({candidates:[{finishReason:'MAX_TOKENS',content:{parts:[{text:'unfinished'}]}}]})}));await b.api.connect('gemini','gemini-3.1-flash-lite','dummy');await assert.rejects(()=>b.api.generate('explain',{}),/완료되지/);});
+test('truncated AI output is not applied',async()=>{const b=browser(new Map(),async()=>({ok:true,json:async()=>({candidates:[{finishReason:'MAX_TOKENS',content:{parts:[{text:'unfinished'}]}}]})}));await b.api.connect('gemini','gemini-3.1-flash-lite','dummy');await assert.rejects(()=>b.api.generate('explain',{}),error=>error.code==='OUTPUT_LIMIT'&&/MAX_TOKENS/.test(error.message));});
 test('disconnect while request is pending discards the response',async()=>{let resolveResponse;const b=browser(new Map(),()=>new Promise(resolve=>{resolveResponse=resolve;}));await b.api.connect('gemini','gemini-3.1-flash-lite','dummy');const task=b.api.generate('explain',{});while(!resolveResponse)await new Promise(resolve=>setImmediate(resolve));await b.api.disconnect();resolveResponse({ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:'late result'}]}}]})});await assert.rejects(()=>task,/변경/);});
 
 test('business overview uses structured output and its own evidence-based instruction',async()=>{
@@ -73,5 +73,28 @@ test('Claude overview and glossary request structured output and share existing 
 test('Claude truncation is rejected and errors identify the selected model',async()=>{
   const b=browser(new Map(),async()=>({ok:true,json:async()=>({stop_reason:'max_tokens',content:[{type:'text',text:'incomplete'}]})}));
   await b.api.connect('anthropic','claude-opus-5-5','dummy');
-  await assert.rejects(()=>b.api.generate('explain',{}),/Claude Opus 5.5 응답이 완료되지/);
+  await assert.rejects(()=>b.api.generate('explain',{}),error=>error.code==='OUTPUT_LIMIT'&&/Claude Opus 5.5.*max_tokens/.test(error.message));
+});
+
+test('all providers distinguish output limit from refusal and use a larger overview budget',async()=>{
+  for(const [provider,model,response,expected] of [
+    ['gemini','gemini-3.1-flash-lite',{candidates:[{finishReason:'MAX_TOKENS'}]},'MAX_TOKENS'],
+    ['anthropic','claude-opus-5-5',{stop_reason:'max_tokens'},'max_tokens'],
+    ['openai','gpt-5-mini',{status:'incomplete',incomplete_details:{reason:'max_output_tokens'}},'max_output_tokens']
+  ]){
+    const b=browser(new Map(),async()=>({ok:true,json:async()=>response}));await b.api.connect(provider,model,'dummy');
+    await assert.rejects(()=>b.api.generate('overview',{}),error=>error.code==='OUTPUT_LIMIT'&&error.message.includes(expected));
+    const body=JSON.parse(b.calls[0].options.body);
+    assert.equal(body.generationConfig?.maxOutputTokens||body.max_tokens||body.max_output_tokens,16384);
+    if(provider==='anthropic')assert.equal(body.output_config.effort,'medium');
+    assert.equal(b.calls.length,1);
+  }
+  const b=browser(new Map(),async()=>({ok:true,json:async()=>({stop_reason:'refusal'})}));await b.api.connect('anthropic','claude-opus-5-5','dummy');
+  await assert.rejects(()=>b.api.generate('overview',{}),{code:'REFUSAL'});
+});
+
+test('malformed structured overview replies carry a recoverable error',async()=>{
+  const b=browser(new Map(),async()=>({ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:'{"items":['}]}}]})}));
+  await b.api.connect('gemini','gemini-3.1-flash-lite','dummy');
+  await assert.rejects(()=>b.api.generate('overview',{}),{code:'INVALID_JSON'});
 });

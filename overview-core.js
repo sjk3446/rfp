@@ -3,7 +3,7 @@
   'use strict';
   const categories=['사업개요·목적','사업범위','사업기간','예산·대금','추진일정','참가자격','제출서류·제출방법','평가·선정','계약조건','수행·운영조건','산출물·보고','보안·준수사항','기타 중요사항'];
   const normalized=value=>String(value||'').replace(/\s+/g,'').normalize('NFKC');
-  function batches(text,limit=24000){
+  function batches(text,limit=8000){
     if(limit<1000)throw new Error('분석 구간 크기가 너무 작습니다.');
     const parts=String(text||'').split(/(\[\[(?:PAGE|SHEET):[^\]\n]+\]\])/g),units=[];
     let label='본문',page=null,sheet='',sequence=0;
@@ -28,6 +28,54 @@
     return{items,rejected};
   }
   function merge(results){const items=[],seen=new Set();let rejected=0;for(const result of results){rejected+=result.rejected||0;for(const item of result.items){const key=normalized(`${item.category}|${item.content}|${item.quote}`);if(!seen.has(key)){seen.add(key);items.push(item);}}}return{items,rejected};}
+  const batchSize=batch=>batch.reduce((size,unit)=>size+unit.text.length,0);
+  function progress(data){
+    const total=data.batches.reduce((sum,batch)=>sum+batchSize(batch),0);
+    const completed=data.batches.reduce((sum,batch,index)=>sum+(data.results[index]?batchSize(batch):0),0);
+    return total?Math.floor(100*completed/total):0;
+  }
+  function splitBatch(batch){
+    const size=batchSize(batch);if(size<2000)return null;
+    const halfway=Math.floor(size/2),left=[],right=[];let offset=0;
+    for(const unit of batch){
+      const end=offset+unit.text.length;
+      if(end<=halfway)left.push(unit);
+      else if(offset>=halfway)right.push(unit);
+      else{
+        let cut=halfway-offset;
+        const newline=unit.text.lastIndexOf('\n',cut);
+        if(newline>cut-300&&newline>0)cut=newline+1;
+        // Keep every character and page/sheet reference; split IDs remain unique.
+        if(cut>0)left.push({...unit,sourceId:`${unit.sourceId}-a`,text:unit.text.slice(0,cut)});
+        if(cut<unit.text.length)right.push({...unit,sourceId:`${unit.sourceId}-b`,text:unit.text.slice(cut)});
+      }
+      offset=end;
+    }
+    return left.length&&right.length?[left,right]:null;
+  }
+  async function analyze(data,{request,shouldStop=()=>false,onEvent=()=>{}}){
+    data.depths ||= data.batches.map(()=>0);
+    for(let index=0;index<data.batches.length;){
+      if(shouldStop())throw new Error('분석을 중단했습니다. 완료된 구간은 유지되며 이어서 분석할 수 있습니다.');
+      if(data.results[index]){index++;continue;}
+      onEvent({type:'request',index});
+      try{
+        const response=await request(data.batches[index]);
+        data.results[index]=validate(response,data.batches[index]);
+        onEvent({type:'completed',index});index++;
+      }catch(error){
+        const retryable=['OUTPUT_LIMIT','CONTEXT_LIMIT','INVALID_JSON','AI_TIMEOUT'].includes(error.code);
+        const depth=data.depths[index]||0,parts=retryable&&depth<3?splitBatch(data.batches[index]):null;
+        if(!parts)throw error;
+        data.batches.splice(index,1,...parts);
+        data.results.splice(index,1,undefined,undefined);
+        data.depths.splice(index,1,depth+1,depth+1);
+        data.splitCount=(data.splitCount||0)+1;
+        onEvent({type:'split',index,reason:error.message});
+      }
+    }
+    return merge(data.results);
+  }
   function workflow({hasFile=false,prepared=false,draft=false,saved=false,completed=0,total=0,operation='',readDone=0,readTotal=0,errorStage='',stopped=false}={}){
     const count=Math.max(0,Math.min(Number(completed)||0,Number(total)||0));
     const pending=prepared&&count<total;
@@ -61,5 +109,5 @@
     const counts=Object.fromEntries(categories.map(name=>[name,matched.filter(item=>item.category===name).length]));
     return{items:matched.filter(item=>!category||item.category===category),counts,matched:matched.length,total:items.length};
   }
-  return{categories,batches,validate,merge,workflow,filterItems};
+  return{categories,batches,validate,merge,workflow,filterItems,splitBatch,progress,analyze};
 });

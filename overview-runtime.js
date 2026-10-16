@@ -13,7 +13,9 @@
   function message(text){status.textContent=text;}
   function workflow(){
     const data=prepared.get(current()),record=drafts.get(current())?.result||saved(),error=errors.get(current());
-    return core.workflow({hasFile:!!current(),prepared:!!data,draft:drafts.has(current()),saved:!!saved(),completed:data?data.results.filter(Boolean).length:record?.completedBatches||0,total:data?data.batches.length:record?.totalBatches||0,operation,readDone:readProgress.completed||0,readTotal:readProgress.total||0,errorStage:error?.stage||'',stopped:!!error?.stopped});
+    const view=core.workflow({hasFile:!!current(),prepared:!!data,draft:drafts.has(current()),saved:!!saved(),completed:data?data.results.filter(Boolean).length:record?.completedBatches||0,total:data?data.batches.length:record?.totalBatches||0,operation,readDone:readProgress.completed||0,readTotal:readProgress.total||0,errorStage:error?.stage||'',stopped:!!error?.stopped});
+    if(data&&view.activeStep>=3&&view.percent!==null)view.percent=core.progress(data);
+    return view;
   }
   function updateFlow(){
     if(!modal)return;const view=workflow(),data=prepared.get(current());
@@ -36,7 +38,7 @@
     let detail=operation==='reading'?(readProgress.total?`${readProgress.completed} / ${readProgress.total}페이지 읽음`:'문서 형식에 따라 완료 후 분량이 표시됩니다.'):operation==='loading'?'원본을 불러오는 동안에는 진행률을 계산할 수 없습니다.':view.total?`${view.completed} / ${view.total}구간 완료${operation==='analyzing'?` · ${Math.min(view.completed+1,view.total)}번째 구간 응답 대기 중`:''}`:'문서를 읽으면 분석 구간 수를 표시합니다.';
     if(busy&&startedAt){const seconds=Math.floor((Date.now()-startedAt)/1000);detail+=` · 경과 ${Math.floor(seconds/60)}분 ${seconds%60}초`;}
     modal.querySelector('[data-flow-detail]').textContent=detail;
-    modal.querySelector('[data-flow-volume]').textContent=data?`${data.characters.toLocaleString('ko-KR')}자 · ${data.batches.length}개 분석 구간 · AI 요청 ${view.remaining}회 남음`:current()?'전체 문서를 읽은 후 AI 요청 횟수를 먼저 알려드립니다.':'분석할 원본 RFP가 없습니다.';
+    modal.querySelector('[data-flow-volume]').textContent=data?`${data.characters.toLocaleString('ko-KR')}자 · ${data.batches.length}개 분석 구간 · AI 요청 ${view.remaining}회 남음${data.splitCount?` · 응답 크기에 맞춰 ${data.splitCount}회 자동 분할`:''}`:current()?'전체 문서를 읽은 후 AI 요청 횟수를 먼저 알려드립니다.':'분석할 원본 RFP가 없습니다.';
     modal.querySelector('[data-flow-ai]').textContent=aiConnected?`${aiInfo.label} 연결됨`:'AI 연결 필요';
     modal.querySelector('[data-flow-ai]').className=aiConnected?'overview-ai-badge connected':'overview-ai-badge';
     modal.querySelector('[data-flow-result-label]').textContent=drafts.has(current())?'분석 결과 · 검토 후 저장해 주세요':saved()?'저장된 사업 정보':'분석 결과가 여기에 표시됩니다';
@@ -116,17 +118,12 @@
     const id=current(),data=prepared.get(id);if(!data)return;
     activeAiInfo={...aiInfo};begin('analyzing');const expectedSavedAt=saved()?.savedAt||'';
     try{
-      for(let i=0;i<data.batches.length;i++){
-        if(stopped)throw new Error('분석을 중단했습니다. 버튼을 다시 누르면 완료된 구간 이후부터 이어서 분석합니다.');
-        if(data.project!==window.ReqlyApp.projectId)throw new Error('프로젝트가 변경되어 분석을 중단했습니다.');
-        if(data.results[i])continue;
-        message(`${activeAiInfo.label} 분석 중 · ${i+1}/${data.batches.length}구간. 완료된 구간은 재호출하지 않습니다.`);
-        const response=await window.ReqlyPersistentAI.generate('overview',{documentName:data.file.name,categories:core.categories,units:data.batches[i]});
-        data.results[i]=core.validate(response,data.batches[i]);
-        controls();
-      }
+      const merged=await core.analyze(data,{
+        shouldStop:()=>stopped||data.project!==window.ReqlyApp.projectId,
+        request:async units=>{const response=await window.ReqlyPersistentAI.generate('overview',{documentName:data.file.name,categories:core.categories,units});if(data.project!==window.ReqlyApp.projectId)throw new Error('프로젝트가 변경되어 분석을 중단했습니다.');return response;},
+        onEvent:event=>{controls();if(event.type==='request')message(`${activeAiInfo.label} 분석 중 · ${event.index+1}/${data.batches.length}구간. 완료된 구간은 재호출하지 않습니다.`);else if(event.type==='split')message(`${event.reason} 해당 구간을 둘로 나누어 이어서 분석합니다.`);}
+      });
       if(stopped)throw new Error('분석을 중단했습니다. 결과는 아직 저장하지 않았습니다.');
-      const merged=core.merge(data.results);
       const result={...merged,sourceName:data.file.name,sourceType:data.file.name.split('.').pop().toUpperCase(),sourceSize:data.file.size,pages:data.pages,characters:data.characters,analyzedAt:new Date().toISOString(),completedBatches:data.results.length,totalBatches:data.batches.length};
       drafts.set(id,{result,expectedSavedAt});render();message(`${activeAiInfo.label} 분석이 완료되었습니다. 근거를 검토한 뒤 ‘결과 저장’을 눌러 주세요.`);
     }catch(error){errors.set(id,{stage:'analyze',stopped});message(`${error.message} 기존 저장 결과는 유지됩니다.`);}finally{end();}
