@@ -145,11 +145,11 @@
       if (openButton) { localStorage.setItem(ACTIVE_KEY, openButton.dataset.openProject); location.reload(); }
       if (exportButton) {
         const project = await dbGet(exportButton.dataset.exportProject);
-        download(`${project.name.replace(/[\\/:*?"<>|]/g,'_')}_Reqly백업.json`, new Blob([JSON.stringify({format:'reqly-pages-project',version:1,project}, null, 2)], {type:'application/json'}));
+        download(`${project.name.replace(/[\\/:*?"<>|]/g,'_')}_Muhammad백업.json`, new Blob([JSON.stringify({format:'reqly-pages-project',version:1,project}, null, 2)], {type:'application/json'}));
       }
       if (deleteButton) {
         const project = await dbGet(deleteButton.dataset.deleteProject);
-        if (!confirm(`‘${project.name}’ 프로젝트를 이 브라우저에서 삭제할까요?\n백업하지 않았다면 복구할 수 없습니다.`)) return;
+        if (!(await(window.ReqlyDesign?.confirm('프로젝트 삭제',`‘${project.name}’ 프로젝트를 이 브라우저에서 삭제할까요?\n백업하지 않았다면 복구할 수 없습니다.`)??confirm(`‘${project.name}’ 프로젝트를 이 브라우저에서 삭제할까요?\n백업하지 않았다면 복구할 수 없습니다.`)))) return;
         await dbDelete(project.id);
         if (project.id === currentProject?.id) {
           const remaining = await dbAll();
@@ -160,7 +160,7 @@
         await renderProjects(modal);
       }
       if (event.target.closest('[data-new-project]')) {
-        const name = prompt('새 프로젝트 이름을 입력하세요.', '새 RFP 프로젝트');
+        const name = await(window.ReqlyDesign?.prompt('새 프로젝트','프로젝트 이름','새 RFP 프로젝트')??prompt('새 프로젝트 이름을 입력하세요.', '새 RFP 프로젝트'));
         if (name === null) return;
         const project = await newProject(name); localStorage.setItem(ACTIVE_KEY, project.id); location.reload();
       }
@@ -169,13 +169,13 @@
     modal.querySelector('[data-import-input]').addEventListener('change', async event => {
       try {
         const payload = JSON.parse(await event.target.files[0].text());
-        if (payload.format !== 'reqly-pages-project' || !payload.project?.workspace) throw new Error('Reqly 프로젝트 백업 파일이 아닙니다.');
+        if (payload.format !== 'reqly-pages-project' || !payload.project?.workspace) throw new Error('Muhammad 프로젝트 백업 파일이 아닙니다.');
         const projects = await dbAll();
         if (projects.length >= MAX_PROJECTS) throw new Error('프로젝트 3개를 사용 중입니다. 하나를 삭제한 뒤 가져오세요.');
         const id = uid();
         const imported = {...payload.project,id,name:`${payload.project.name} (가져옴)`,updatedAt:now(),workspace:{...payload.project.workspace,projectId:id}};
         await dbPut(imported); localStorage.setItem(ACTIVE_KEY,id); location.reload();
-      } catch (error) { alert(error.message); }
+      } catch (error) { if(window.ReqlyDesign)await window.ReqlyDesign.notice('백업을 가져오지 못했습니다',error.message);else alert(error.message); }
     });
   }
 
@@ -196,9 +196,9 @@
   }
 
   function installAiUi() {
-    const modal = modalShell('aiModal', 'AI 보안 연결', 'API 키는 GitHub Pages에 저장하거나 전달하지 않습니다.', `
+    const modal = modalShell('aiModal', 'AI 도우미 연결', 'AI와 모델을 선택해 주세요.', `
       <div class="helper-status"><i class="helper-dot" data-helper-dot></i><span data-helper-status>연결 확인 전</span></div>
-      <p class="privacy-warning">AI 기능을 사용할 때에만 선택한 요구사항 내용이 로컬 도우미를 거쳐 AI 제공사로 전송됩니다. RFP 파일 전체는 자동 전송되지 않습니다.</p>
+      <p class="privacy-warning">사용할 AI와 모델을 선택하고 본인의 API 키를 연결해 주세요.</p>
       <p class="pages-note">처음 사용하는 PC라면 <a class="pages-action" href="./local-helper/Reqly-AI-도우미.zip" download>AI 도우미 다운로드</a> 후 압축을 풀고 <b>Reqly-AI-도우미.bat</b>를 실행하세요.</p>
       <label class="pages-field"><span>도우미 창에 표시된 6자리 연결 번호</span><div class="helper-grid"><input data-pair-code inputmode="numeric" maxlength="6" placeholder="예: 123456"><button class="pages-action primary" data-pair>연결</button></div></label>
       <label class="pages-field"><span>사용할 AI</span><select data-provider><option value="gemini">Google Gemini</option><option value="openai">OpenAI GPT</option></select></label>
@@ -314,13 +314,14 @@
 
   async function extractExcel(file){
     if(!window.XLSX)throw new Error('Excel 분석 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.');
-    const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const structured=[];const fallback=[];
+    const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const structured=[];const fallback=[],fullText=[];
     for(const sheetName of workbook.SheetNames){const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:'',raw:false});let headerIndex=-1,map={};for(let i=0;i<Math.min(rows.length,80);i++){const found={};rows[i].forEach((cell,col)=>{const field=matchHeader(cell);if(field&&!Object.hasOwn(found,field))found[field]=col;});if((found.name!==undefined||found.description!==undefined)&&(found.id!==undefined||(found.name!==undefined&&found.description!==undefined))){headerIndex=i;map=found;break;}}
+      fullText.push(`[[SHEET:${sheetName}]]`,...rows.map((row,i)=>`[[ROW:${i+1}]]\n${row.map(value=>String(value??'')).join(' | ')}`));
       if(headerIndex>=0){const carried={level1:'',level2:'',level3:'',level4:'',category:''};for(let i=headerIndex+1;i<rows.length;i++){const values={};for(const [field,col] of Object.entries(map))values[field]=['description','applicationPlan','changeHistory'].includes(field)?parser.multiline(rows[i][col]):clean(rows[i][col]);for(const field of Object.keys(carried)){if(values[field])carried[field]=values[field];else values[field]=carried[field];}if(!values.name&&!values.description)continue;structured.push({...values,description:values.description||values.name,section:[values.level1,values.level2,values.level3,values.level4].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' > ')||sheetName,source:`${sheetName} 시트 · ${i+1}행`});}}
       else {for(let i=0;i<rows.length;i++){const cells=rows[i].map(clean).filter(Boolean);if(cells.length)fallback.push(`[[SHEET:${sheetName}]]\n[[ROW:${i+1}]]\n${cells.join(' | ')}`);}}
     }
     const source=structured.length?structured.map((row,i)=>requirement(row,i+1)):buildTextRequirements(fallback.join('\n'));
-    const result=[],seen=new Map();for(const req of source){if(req.id&&seen.has(req.id.toLowerCase())){const idx=seen.get(req.id.toLowerCase());if(req.description.length>result[idx].description.length){req.key=result[idx].key;req.sourceOrder=result[idx].sourceOrder;result[idx]=req;}continue;}if(req.id)seen.set(req.id.toLowerCase(),result.length);result.push(req);}return {text:fallback.join('\n'),requirements:result,pages:workbook.SheetNames.length};
+    const result=[],seen=new Map();for(const req of source){if(req.id&&seen.has(req.id.toLowerCase())){const idx=seen.get(req.id.toLowerCase());if(req.description.length>result[idx].description.length){req.key=result[idx].key;req.sourceOrder=result[idx].sourceOrder;result[idx]=req;}continue;}if(req.id)seen.set(req.id.toLowerCase(),result.length);result.push(req);}return {text:fullText.join('\n'),requirements:result,pages:workbook.SheetNames.length};
   }
 
   async function extractZipXml(file,kind){
@@ -330,14 +331,14 @@
     return {text:lines.join('\n'),pages};
   }
 
-  async function extractFile(file){
+  async function extractFile(file, {onProgress}={}){
     const ext=file.name.split('.').pop().toLowerCase();
     if(['xlsx','xlsm','xls','csv','tsv'].includes(ext))return extractExcel(file);
     if(ext==='pdf'){
       if(!window.pdfjsLib)throw new Error('PDF 분석 도구를 불러오지 못했습니다.');
       pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
       const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-      const count=pdf.numPages, pages=[];
+      const count=pdf.numPages, pages=[];onProgress?.({completed:0,total:count,unit:'페이지'});
       let previousLayout=null;
       try {
         for(let i=1;i<=count;i++){
@@ -346,6 +347,7 @@
           previousLayout=layout;
           pages.push(`[[PAGE:${i}]]\n${layout.tableLayout?'[[TABLE_LAYOUT]]\n':''}${layout.text}`);
           page.cleanup();
+          onProgress?.({completed:i,total:count,unit:'페이지'});
         }
       } finally {await pdf.destroy();}
       return{text:pages.join('\n'),pages:count};
@@ -359,6 +361,7 @@
   function jsonResponse(payload,status=200){return new Response(JSON.stringify(payload),{status,headers:{'Content-Type':'application/json;charset=utf-8'}});}
 
   async function aiGenerate(task,payload){
+    if(window.ReqlyPersistentAI) return window.ReqlyPersistentAI.generate(task,payload);
     if(!helperToken)throw new Error('AI 보안 연결이 필요합니다. 화면 위쪽의 ‘AI 연결’에서 로컬 도우미와 연결해 주세요.');
     {
       const health = await helperJson('/health');
@@ -376,7 +379,7 @@
       if(path.endsWith('/api/enrich')){const files=options.body.getAll('references');const references=[];for(const file of files){const out=await extractFile(file);references.push({name:file.name,type:file.name.split('.').pop().toUpperCase(),size:file.size,pages:out.pages||1,characters:out.text.length,text:out.text.slice(0,250000)});}return jsonResponse({references});}
       if(path.endsWith('/api/explain')) {
         const body=JSON.parse(options.body||'{}');
-        const project=await dbGet(body.projectId);
+        const project=window.ReqlyShared?.enabled ? window.ReqlyShared.project : await dbGet(body.projectId);
         const req=body.requirement||{};
         const result=await aiGenerate('explain',{
           requirement:{id:req.id,name:req.name,category:req.category,description:req.description},
@@ -385,7 +388,7 @@
         if(!String(result.text||'').trim()) throw new Error('AI가 빈 설명을 반환했습니다. 기존 설명은 변경하지 않았습니다.');
         return jsonResponse({easyExplanation:result.text,explanationSources:result.sources||[]});
       }
-      if(path.endsWith('/api/glossary')){const body=JSON.parse(options.body||'{}');try{const result=await aiGenerate('glossary',{terms:body.terms,context:String(body.context||'').slice(0,10000)});return jsonResponse({results:result.results||[]});}catch(error){if(helperToken)throw error;const results=[];for(const term of (body.terms||[]).slice(0,10)){try{const api=`https://ko.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json&origin=*`;const data=await nativeFetch(api).then(r=>r.json());const pages=Object.values(data.query?.pages||{}).sort((a,b)=>(a.index||0)-(b.index||0));results.push({term,candidates:pages.map((p,i)=>({full:p.title,meaning:clean(p.extract).slice(0,650)||'설명이 없습니다.',source:'위키백과',sourceUrl:p.fullurl,score:100-i}))});}catch(_e){results.push({term,candidates:[]});}}return jsonResponse({results});}}
+      if(path.endsWith('/api/glossary')){const body=JSON.parse(options.body||'{}');try{const result=await aiGenerate('glossary',{terms:body.terms,context:String(body.context||'').slice(0,10000)});return jsonResponse({results:result.results||[]});}catch(error){if(helperToken || window.ReqlyPersistentAI)throw error;const results=[];for(const term of (body.terms||[]).slice(0,10)){try{const api=`https://ko.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json&origin=*`;const data=await nativeFetch(api).then(r=>r.json());const pages=Object.values(data.query?.pages||{}).sort((a,b)=>(a.index||0)-(b.index||0));results.push({term,candidates:pages.map((p,i)=>({full:p.title,meaning:clean(p.extract).slice(0,650)||'설명이 없습니다.',source:'위키백과',sourceUrl:p.fullurl,score:100-i}))});}catch(_e){results.push({term,candidates:[]});}}return jsonResponse({results});}}
       if(path.endsWith('/api/export-questions')){if(!window.XLSX)throw new Error('Excel 생성 도구를 불러오지 못했습니다.');const body=JSON.parse(options.body||'{}');const rows=[['RFP 원문 순서','요구사항 ID','요구사항 명칭','분류','관점','질의사항','답변']];for(const req of body.requirements||[])for(const q of req.questions||[])rows.push([req.sourceOrder,req.id,req.name,req.category,q.perspective,q.question,q.answer]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'질의응답');const data=XLSX.write(wb,{type:'array',bookType:'xlsx'});return new Response(data,{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}});}
       return jsonResponse({error:'지원하지 않는 로컬 API입니다.'},404);
     }catch(error){return jsonResponse({error:error.message||String(error)},400);}
@@ -397,12 +400,24 @@
   };
 
   window.ReqlyPortal = {
+    extractFile,
     project:null,
     async start(){
-      installUiStyles(); installProjectUi(); installAiUi();
+      installUiStyles();
+      if(!window.ReqlyShared?.enabled) installProjectUi();
+      if(window.ReqlyPersistentAI) window.ReqlyPersistentAI.installUi(); else installAiUi();
+      if(window.ReqlyShared?.enabled){
+        const boot=await window.ReqlyShared.start();
+        this.project={id:window.ReqlyShared.project.id,name:window.ReqlyShared.project.name};
+        window.ReqlyFiles?.installUi();
+        return boot;
+      }
       const projects=await dbAll();let id=localStorage.getItem(ACTIVE_KEY);currentProject=projects.find(p=>p.id===id)||projects[0]||await newProject();
       localStorage.setItem(ACTIVE_KEY,currentProject.id);this.project={id:currentProject.id,name:currentProject.name};return{workspace:currentProject.workspace||emptyWorkspace(currentProject.id)};
     },
-    saveWorkspace(workspace){scheduleSave(workspace);}
+    saveWorkspace(workspace){
+      if(window.ReqlyShared?.enabled) return window.ReqlyShared.saveItems(workspace.requirements);
+      scheduleSave(workspace);
+    }
   };
 })();

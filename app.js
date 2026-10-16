@@ -250,88 +250,6 @@ const QUESTION_TEMPLATES = {
   },
 };
 
-const sampleRequirements = [
-  {
-    key: 'sample-1', id: 'COR-001', category: '제약사항', name: '개발 표준 준수',
-    description: '시스템 개발 표준 정의서를 작성하고 이를 준수하여 서비스 구현 과정을 관리하여야 한다.',
-    priority: '높음', status: '확정', confidence: 97, source: '18페이지 · 3.1절', section: '제약사항 요구사항', basis: '명시 ID',
-    tags: ['개발표준', '준수'], acceptance: '수용', applicationPlan: '착수 단계에서 개발 표준서를 작성하고 형상관리 저장소에 등록한다.', owner: '김서준 (개발팀)', changeHistory: 'v1.0 최초 등록', completion: '진행 중',
-    questions: [{ key: 'q-sample-1', perspective: '개발', question: '준수 대상 개발 표준의 최신 버전과 예외 승인 절차를 확인해 주세요.', answer: '착수 후 발주기관이 최신 표준서를 제공합니다.' }],
-  },
-  {
-    key: 'sample-2', id: 'COR-002', category: '제약사항', name: '정보시스템 구축 규정 및 표준 준수',
-    description: '행정기관 및 공공기관 정보시스템 구축·운영 지침과 관련 법령을 준수하여야 한다.',
-    priority: '높음', status: '검토 중', confidence: 96, source: '19페이지 · 3.1절', section: '제약사항 요구사항', basis: '명시 ID',
-    tags: ['법령', '공공'], acceptance: '수용', applicationPlan: '준수 대상 체크리스트를 품질계획서에 포함한다.', owner: '이하은 (품질팀)', changeHistory: '', completion: '미완료',
-  },
-  {
-    key: 'sample-3', id: 'SFR-001', category: '기능', name: '통합 사용자 인증',
-    description: '사용자는 하나의 계정으로 포털과 업무 시스템에 로그인할 수 있어야 하며 관리자는 계정 상태를 관리할 수 있어야 한다.',
-    priority: '높음', status: '확정', confidence: 95, source: '24페이지 · 4.2절', section: '기능 요구사항', basis: '명시 ID',
-    tags: ['로그인', '사용자'], acceptance: '수용', applicationPlan: 'SSO 기반 통합 인증 모듈과 관리자 화면을 구축한다.', owner: '박지호 (플랫폼팀)', changeHistory: 'v1.1 MFA 범위 추가', completion: '완료',
-  },
-  {
-    key: 'sample-4', id: 'SFR-002', category: '기능', name: '사용자 권한별 메뉴 제공',
-    description: '사용자의 역할과 권한에 따라 접근 가능한 메뉴와 기능을 차등 제공하여야 한다.',
-    priority: '보통', status: '검토 전', confidence: 91, source: '25페이지 · 4.2절', section: '기능 요구사항', basis: '명시 ID',
-    tags: ['권한', '메뉴'], acceptance: '미검토', applicationPlan: '', owner: '', changeHistory: '', completion: '미완료',
-  },
-  {
-    key: 'sample-5', id: 'PER-001', category: '성능', name: '주요 화면 응답시간 보장',
-    description: '동시 사용자 1,000명 환경에서 주요 화면의 95%는 3초 이내에 응답하여야 한다.',
-    priority: '높음', status: '검토 중', confidence: 98, source: '37페이지 · 5.1절', section: '성능 요구사항', basis: '명시 ID',
-    tags: ['응답시간', '부하'], acceptance: '조건부 수용', applicationPlan: '부하 테스트 시나리오와 성능 튜닝 기준을 수립한다.', owner: '최윤아 (인프라팀)', changeHistory: '동시 사용자 800→1,000명', completion: '진행 중',
-  },
-  {
-    key: 'sample-6', id: 'ECR-001', category: '시스템장비', name: '애플리케이션 서버 이중화',
-    description: '서비스 연속성을 위해 애플리케이션 서버는 이중화로 구성하고 장애 시 자동 전환되어야 한다.',
-    priority: '높음', status: '검토 전', confidence: 94, source: '41페이지 · 5.3절', section: '시스템장비 구성 요구사항', basis: '명시 ID',
-    tags: ['서버', '이중화'], acceptance: '미검토', applicationPlan: '', owner: '정민준 (인프라팀)', changeHistory: '', completion: '미완료',
-  },
-  {
-    key: 'sample-7', id: 'SIR-001', category: '인터페이스', name: '외부 행정정보 시스템 연계',
-    description: '외부 행정정보 시스템과 표준 REST API 방식으로 데이터를 송수신하고 연계 오류 내역을 기록하여야 한다.',
-    priority: '높음', status: '검토 중', confidence: 97, source: '44페이지 · 6.1절', section: '인터페이스 요구사항', basis: '명시 ID',
-    tags: ['REST API', '연계'], acceptance: '수용', applicationPlan: 'API Gateway와 연계 모니터링 로그를 적용한다.', owner: '한도윤 (연계팀)', changeHistory: '', completion: '진행 중',
-    questions: [{ key: 'q-sample-2', perspective: 'UI/UX', question: '외부 연계 실패 시 사용자에게 표시할 오류 메시지와 재시도 방식은 무엇인가요?', answer: '' }, { key: 'q-sample-3', perspective: '개발', question: '연계 API의 인증 방식, 타임아웃, 재처리 정책을 제공할 수 있나요?', answer: '' }],
-  },
-  {
-    key: 'sample-8', id: 'DAR-001', category: '데이터', name: '기준정보 데이터 표준화',
-    description: '기준정보를 관리하기 위한 코드관리 체계와 데이터 표준화 방안을 수립하고 데이터 정합성을 검증하여야 한다.',
-    priority: '보통', status: '검토 전', confidence: 93, source: '48페이지 · 7.1절', section: '데이터 요구사항', basis: '명시 ID',
-    tags: ['기준정보', '표준화'], acceptance: '미검토', applicationPlan: '', owner: '', changeHistory: '', completion: '미완료',
-  },
-  {
-    key: 'sample-9', id: 'SER-001', category: '보안', name: '개인정보 암호화 및 접근통제',
-    description: '개인정보는 저장 및 전송 시 안전한 알고리즘으로 암호화하고 권한 없는 사용자의 접근을 차단하여야 한다.',
-    priority: '높음', status: '확정', confidence: 99, source: '53페이지 · 8.2절', section: '보안 요구사항', basis: '명시 ID',
-    tags: ['개인정보', '암호화'], acceptance: '수용', applicationPlan: 'AES-256 저장 암호화와 TLS 1.3 전송 암호화를 적용한다.', owner: '서예린 (보안팀)', changeHistory: '', completion: '완료',
-  },
-  {
-    key: 'sample-10', id: 'TER-001', category: '테스트', name: '통합 및 인수시험 수행',
-    description: '기능·성능·보안 요구사항을 기준으로 통합시험과 사용자 인수시험을 수행하고 결함 조치 결과를 제출하여야 한다.',
-    priority: '보통', status: '검토 전', confidence: 94, source: '61페이지 · 9.1절', section: '테스트 요구사항', basis: '명시 ID',
-    tags: ['통합시험', '인수시험'], acceptance: '미검토', applicationPlan: '', owner: '이하은 (품질팀)', changeHistory: '', completion: '미완료',
-  },
-  {
-    key: 'sample-11', id: 'SOR-001', category: '운영', name: '장애 모니터링 및 통보',
-    description: '시스템 주요 자원의 상태를 실시간 모니터링하고 장애 발생 시 담당자에게 즉시 통보하여야 한다.',
-    priority: '높음', status: '검토 중', confidence: 93, source: '66페이지 · 10.1절', section: '운영 요구사항', basis: '명시 ID',
-    tags: ['모니터링', '장애'], acceptance: '수용', applicationPlan: 'APM과 통합 알림 채널을 구성한다.', owner: '정민준 (인프라팀)', changeHistory: '', completion: '진행 중',
-  },
-  {
-    key: 'sample-12', id: 'PMR-001', category: '프로젝트관리', name: '주간 진도 및 위험 보고',
-    description: '사업자는 주간 단위로 진도, 이슈, 위험, 변경 사항을 정리하여 발주기관에 보고하여야 한다.',
-    priority: '보통', status: '검토 전', confidence: 90, source: '72페이지 · 11.2절', section: '프로젝트관리 요구사항', basis: '명시 ID',
-    tags: ['진도', '위험관리'], acceptance: '미검토', applicationPlan: '', owner: '오수빈 (PMO)', changeHistory: '', completion: '미완료',
-  },
-];
-
-const sampleDocument = {
-  name: '공공 서비스 통합 플랫폼 구축 RFP.pdf', type: 'PDF', size: 4289012,
-  pages: 86, characters: 48392, demo: true,
-};
-
 const elements = {};
 let state = {
   projectId: makeProjectId(),
@@ -345,7 +263,6 @@ let state = {
   draftQuestions: [],
   draftGlossary: [], visibleGlossary: [], remoteGlossary: [], draftExplanationSources: [], currentGlossaryTerm: null,
   glossaryDetectionRequested: false,
-  relationMap: new Map(),
 };
 
 function $(id) { return document.getElementById(id); }
@@ -362,6 +279,9 @@ function normalizeRequirement(item, index = 0) {
   return {
     key: item.key || makeKey(), id: item.id || '', name: item.name || '요구사항', description: item.description || '',
     sourceOrder,
+    revision: item.revision || 0, savedAt: item.savedAt || '',
+    rfpSources: item.rfpSources || {}, latestSource: item.latestSource || null,
+    sourceChanged: !!item.sourceChanged, absentInLatest: !!item.absentInLatest,
     category: CATEGORIES.some(c => c.name === item.category) ? item.category : '기타',
     priority: ['높음', '보통', '낮음'].includes(item.priority) ? item.priority : '보통',
     status: ['검토 전', '검토 중', '확정'].includes(item.status) ? item.status : '검토 전',
@@ -387,24 +307,25 @@ function normalizeRequirement(item, index = 0) {
 
 function cacheElements() {
   [
-    'navCount', 'sidebarProject', 'sidebar', 'mobileScrim', 'menuButton', 'clearProject', 'sampleButton', 'uploadButton', 'fileInput',
+    'navCount', 'sidebarProject', 'sidebar', 'mobileScrim', 'menuButton', 'clearProject', 'uploadButton', 'fileInput',
     'documentType', 'documentName', 'documentBadge', 'documentMeta', 'documentBanner', 'reviewProgressText', 'reviewProgressBar',
     'referencePanel', 'referenceButton', 'referenceInput', 'referenceList', 'referenceCount',
     'metricTotal', 'metricNew', 'metricConfirmed', 'metricConfirmedRate', 'metricCompleted', 'listDescription',
     'exportButton', 'exportMenu', 'qaExportButton', 'qaCount', 'addButton', 'searchInput', 'categoryFilter', 'statusFilter', 'priorityFilter', 'flagFilter', 'sortFilter', 'filterReset',
     'categoryStrip', 'idHierarchyFilter', 'idHierarchyPath', 'idHierarchyReset', 'idHierarchyLevels', 'bulkBar', 'selectedCount', 'bulkPriority', 'bulkStatus', 'bulkFlag', 'bulkApply', 'bulkDelete', 'selectAll', 'requirementsBody', 'mobileList', 'emptyState',
-    'emptyUpload', 'emptySample', 'resultCount', 'drawerBackdrop', 'detailDrawer', 'drawerClose', 'drawerTitle', 'requirementForm',
+    'emptyUpload', 'resultCount', 'drawerBackdrop', 'detailDrawer', 'drawerClose', 'drawerTitle', 'requirementForm',
     'formConfidence', 'formSource', 'formId', 'idError', 'formCategory', 'formName', 'nameCount', 'formDescription',
-    'descriptionCount', 'relationPanel', 'relationBody', 'relationCount', 'relationList', 'toggleRelations', 'easyExplanationPanel', 'easyExplanationBody', 'toggleEasyExplanation', 'easyExplanationRequest', 'easyExplanationContent', 'generateEasyExplanation', 'regenerateEasyExplanation', 'formEasyExplanation', 'easyExplanationCount', 'easyExplanationBasis', 'formPriority', 'formStatus', 'formFlag', 'formTags', 'formSourceInput', 'formAcceptance', 'formCompletion',
+    'descriptionCount', 'easyExplanationPanel', 'easyExplanationBody', 'toggleEasyExplanation', 'easyExplanationRequest', 'easyExplanationContent', 'generateEasyExplanation', 'regenerateEasyExplanation', 'formEasyExplanation', 'easyExplanationCount', 'easyExplanationBasis', 'formPriority', 'formStatus', 'formFlag', 'formTags', 'formSourceInput', 'formAcceptance', 'formCompletion',
     'formApplicationPlan', 'formOwner', 'formChangeHistory', 'glossaryPanel', 'glossaryBody', 'toggleGlossary', 'formGlossaryTerms', 'termDefinition', 'termAcronym', 'termName', 'termMeaning', 'termContextNote', 'termCandidates', 'termSource', 'glossarySearchInput', 'glossarySearchButton', 'glossarySearchGuide', 'detectGlossaryButton', 'manualGlossaryToggle', 'manualGlossaryEditor', 'manualTerm', 'manualFull', 'manualMeaning', 'manualGlossaryCancel', 'manualGlossarySave', 'manualGlossaryRemove',
     'formQuestionCount', 'formQuestionList', 'addDirectQuestion', 'deleteButton', 'duplicateButton', 'cancelButton',
-    'relationCompareModal', 'compareType', 'compareTitle', 'compareReason', 'compareHighlightLegend', 'compareCurrentCard', 'compareTargetCard', 'compareClose', 'compareDone',
     'analysisOverlay', 'analysisTitle', 'analysisSubtitle', 'analysisProgress', 'toastStack',
   ].forEach(id => { elements[id] = $(id); });
 }
 
 function saveWorkspace() {
-  window.ReqlyPortal?.saveWorkspace({ projectId: state.projectId, document: state.document, references: state.references, requirements: state.requirements });
+  const result = window.ReqlyPortal?.saveWorkspace({ projectId: state.projectId, document: state.document, references: state.references, requirements: state.requirements });
+  if(result?.catch) result.catch(error=>showToast('공유 저장을 완료하지 못했습니다', error.message, true));
+  return result;
 }
 
 function restoreWorkspace(saved) {
@@ -412,20 +333,6 @@ function restoreWorkspace(saved) {
   state.document = saved?.document || null;
   state.references = Array.isArray(saved?.references) ? saved.references : [];
   state.requirements = Array.isArray(saved?.requirements) ? saved.requirements.map(normalizeRequirement) : [];
-}
-
-function loadSample(notify = true) {
-  state.projectId = window.ReqlyPortal?.project?.id || state.projectId;
-  state.document = { ...sampleDocument };
-  state.references = [];
-  state.requirements = sampleRequirements.map(item => normalizeRequirement({
-    ...item, tags: [...item.tags], questions: (item.questions || []).map(question => ({ ...question })),
-  }));
-  state.selected.clear();
-  resetFilters(false);
-  saveWorkspace();
-  render();
-  if (notify) showToast('샘플 RFP를 불러왔습니다', '요구사항 편집, 필터, 내보내기를 바로 체험할 수 있습니다.');
 }
 
 function formatBytes(bytes) {
@@ -450,114 +357,23 @@ function matchesIdPath(item, path = state.idPath) {
   return path.every((part, index) => hierarchy[index] === part);
 }
 
-const RELATION_STOPWORDS = new Set([
-  '요구사항', '시스템', '기능', '관련', '대한', '위한', '통해', '해야', '하여야', '한다', '있다', '있는',
-  '지원', '제공', '적용', '구축', '관리', '기준', '경우', '해당', '모든', '수행', '사용', '이용', '그리고',
-  '또는', '포함', '필요', '가능', '내용', '정보', '데이터', '서비스', 'shall', 'must', 'with', 'from', 'that',
-]);
-
-function relationTokens(item) {
-  const source = `${item.name || ''} ${item.description || ''} ${(item.tags || []).join(' ')}`.toLowerCase();
-  return new Set((source.match(/[a-z가-힣0-9]{2,}/g) || []).map(token => token
-    .replace(/(?:으로|에서|까지|부터|에게|에는|에도|이며|하고|하는|하도록|해야|하여|한다|됩니다|으로써)$/u, '')
-    .replace(/(?:을|를|이|가|은|는|의|에|와|과|도)$/u, ''))
-    .filter(token => token.length >= 2 && !RELATION_STOPWORDS.has(token) && !/^\d+$/.test(token)));
-}
-
-function numericConstraints(text) {
-  const constraints = [];
-  const pattern = /(최소|최대)?\s*(\d+(?:\.\d+)?)\s*(ms|밀리초|초|분|시간|%|퍼센트|건|명|개|회)\s*(이상|이하|미만|초과|이내)?/gi;
-  for (const match of String(text || '').matchAll(pattern)) {
-    const marker = `${match[1] || ''} ${match[4] || ''}`;
-    const direction = /최소|이상|초과/.test(marker) ? 'min' : /최대|이하|미만|이내/.test(marker) ? 'max' : '';
-    if (direction) constraints.push({ direction, value: Number(match[2]), unit: match[3].toLowerCase(), raw: match[0].trim() });
-  }
-  return constraints;
-}
-
-function conflictReason(left, right, commonTokens = [], similarity = 0) {
-  const leftText = `${left.name} ${left.description}`;
-  const rightText = `${right.name} ${right.description}`;
-  // A shared broad category such as "보안" is not enough evidence of a
-  // contradiction. Require several shared subject words before comparing
-  // opposite constraints.
-  const sameSubject = commonTokens.length >= 2 && similarity >= 0.25;
-  if (!sameSubject) return '';
-  const leftConstraints = numericConstraints(leftText);
-  const rightConstraints = numericConstraints(rightText);
-  for (const first of leftConstraints) {
-    for (const second of rightConstraints) {
-      if (first.unit !== second.unit || first.direction === second.direction) continue;
-      const minimum = first.direction === 'min' ? first : second;
-      const maximum = first.direction === 'max' ? first : second;
-      if (minimum.value > maximum.value) return `수치 조건이 맞지 않을 수 있음: ${minimum.raw} ↔ ${maximum.raw}`;
-    }
-  }
-
-  // “금지”와 “허용”, “필수”와 “선택” 같은 단어만으로는 두 요구사항이
-  // 실제로 충돌하는지 확정할 수 없다. 예를 들어 “취약 알고리즘 금지”와
-  // “승인 알고리즘 사용”은 반대말을 포함하지만 서로 보완적이다. 브라우저의
-  // 자동 판정은 명확한 수치 범위 충돌에만 한정하여 오탐을 줄인다.
-  return '';
-}
-
-function analyzeRequirementRelations() {
-  const relations = new Map(state.requirements.map(item => [item.key, []]));
-  const tokenSets = new Map(state.requirements.map(item => [item.key, relationTokens(item)]));
-  const tokenIndex = new Map();
-  state.requirements.forEach(item => tokenSets.get(item.key).forEach(token => {
-    if (!tokenIndex.has(token)) tokenIndex.set(token, []);
-    tokenIndex.get(token).push(item.key);
-  }));
-
-  const overlaps = new Map();
-  tokenIndex.forEach((keys, token) => {
-    if (keys.length > 80) return;
-    for (let i = 0; i < keys.length; i += 1) {
-      for (let j = i + 1; j < keys.length; j += 1) {
-        const pair = [keys[i], keys[j]].sort();
-        const pairKey = pair.join('\u0000');
-        if (!overlaps.has(pairKey)) overlaps.set(pairKey, { keys: pair, tokens: [] });
-        overlaps.get(pairKey).tokens.push(token);
-      }
-    }
-  });
-
-  const byKey = new Map(state.requirements.map(item => [item.key, item]));
-  overlaps.forEach(candidate => {
-    const [leftKey, rightKey] = candidate.keys;
-    const left = byKey.get(leftKey); const right = byKey.get(rightKey);
-    if (!left || !right) return;
-    const minimumSize = Math.max(1, Math.min(tokenSets.get(leftKey).size, tokenSets.get(rightKey).size));
-    const similarity = candidate.tokens.length / minimumSize;
-    const sameCategory = left.category === right.category;
-    if (candidate.tokens.length < 3 && !(candidate.tokens.length >= 2 && (similarity >= 0.25 || sameCategory))) return;
-    const conflict = conflictReason(left, right, candidate.tokens, similarity);
-    const type = conflict ? 'conflict' : 'related';
-    const reason = conflict || `공통 핵심어: ${candidate.tokens.slice(0, 4).join(', ')}`;
-    const score = candidate.tokens.length + similarity + (type === 'conflict' ? 10 : 0);
-    const topics = candidate.tokens.slice(0, 6);
-    relations.get(leftKey).push({ key: rightKey, type, reason, score, topics });
-    relations.get(rightKey).push({ key: leftKey, type, reason, score, topics });
-  });
-  relations.forEach(items => items.sort((a, b) => b.score - a.score).splice(8));
-  state.relationMap = relations;
-}
-
-function relationsFor(key) { return state.relationMap.get(key) || []; }
-
 function nextFlag(flag) {
   const values = ['', ...FLAG_OPTIONS.map(option => option.value)];
   return values[(values.indexOf(flag) + 1) % values.length];
 }
 
-function updateRequirementFlag(key, flag = null) {
+async function updateRequirementFlag(key, flag = null) {
   const item = state.requirements.find(requirement => requirement.key === key);
   if (!item) return;
   const next = flag === null ? nextFlag(item.flag) : flag;
+  const previous=state.requirements,wasClean=!window.ReqlyApp?.isEditorDirty();
   state.requirements = state.requirements.map(requirement => requirement.key === key ? { ...requirement, flag: next } : requirement);
-  saveWorkspace(); renderRequirements();
-  showToast(next ? `${FLAG_LABELS[next]} 플래그를 지정했습니다` : '플래그를 해제했습니다', `${item.id || item.name} 요구사항`);
+  try{
+    await saveWorkspace();
+    if(state.editingKey===key){elements.formFlag.value=next;if(wasClean)savedEditorSnapshot=editorSnapshot();}
+    renderRequirements();window.ReqlyDesign?.markDirty();
+    showToast(next ? `${FLAG_LABELS[next]} 플래그를 지정했습니다` : '플래그를 해제했습니다', `${item.id || item.name} 요구사항`);
+  }catch(error){state.requirements=window.ReqlyShared?.enabled?window.ReqlyShared.project.workspace.requirements.map(normalizeRequirement):previous;renderRequirements();showToast('플래그를 저장하지 못했습니다',error.message,true);}
 }
 
 function filteredRequirements() {
@@ -583,7 +399,6 @@ function filteredRequirements() {
 }
 
 function render() {
-  analyzeRequirementRelations();
   renderDocument();
   renderReferences();
   renderMetrics();
@@ -591,6 +406,7 @@ function render() {
   renderIdHierarchyControls();
   renderRequirements();
   renderBulkBar();
+  window.ReqlyDesign?.sync();
 }
 
 function renderDocument() {
@@ -712,19 +528,32 @@ function renderRequirements() {
   elements.selectAll.indeterminate = visibleKeys.some(key => state.selected.has(key)) && !elements.selectAll.checked;
   document.querySelectorAll('.sort-button').forEach(button => button.classList.toggle('active', button.dataset.sort === state.sort));
   if (elements.sortFilter) elements.sortFilter.value = `${state.sort}:${state.sortDirection}`;
+  renderWorkbenchList(items);
+  window.ReqlyDesign?.sync();
+}
+
+function renderWorkbenchList(items = filteredRequirements()) {
+  const list = $('workbenchList');
+  if (!list) return;
+  list.innerHTML = items.map(item => `<article class="requirement-record ${item.key === state.editingKey ? 'is-current' : ''}">
+    <input type="checkbox" class="row-check" data-key="${escapeHtml(item.key)}" ${state.selected.has(item.key) ? 'checked' : ''} aria-label="${escapeHtml(item.id || item.name)} 선택">
+    <button type="button" class="record-open" data-open="${escapeHtml(item.key)}" ${item.key === state.editingKey ? 'aria-current="true"' : ''}>
+      <span class="requirement-id">${escapeHtml(item.id || 'ID 없음')}</span><strong class="record-name">${escapeHtml(item.name)}</strong>
+      <span class="record-meta"><span class="status-chip status-${item.status.replaceAll(' ','-')}">${escapeHtml(item.status)}</span><span>${escapeHtml(item.category)}</span>${item.priority === '높음' ? '<span>우선 검토</span>' : ''}</span>
+    </button><button type="button" class="flag-button ${item.flag ? `flag-${escapeHtml(item.flag)}` : ''}" data-flag-key="${escapeHtml(item.key)}" aria-label="${escapeHtml(item.id || item.name)} ${item.flag ? FLAG_LABELS[item.flag]+' 플래그 변경' : '플래그 지정'}">${icon('flag')}</button>
+  </article>`).join('') || (state.requirements.length ? '<div class="no-results">검색 조건에 맞는 항목이 없습니다.<br>필터를 조정하거나 검색어를 지워 주세요.</div>' : '');
+  $('compactListCount').textContent = `${items.length.toLocaleString('ko-KR')}개 항목`;
+  $('compactSelectAll').checked = elements.selectAll.checked;
+  $('compactSelectAll').indeterminate = elements.selectAll.indeterminate;
 }
 
 function requirementRow(item) {
   const statusClass = item.status.replaceAll(' ', '-');
   const displayId = item.id || 'ID 없음';
-  const relations = relationsFor(item.key);
-  const conflicts = relations.filter(relation => relation.type === 'conflict').length;
-  const related = relations.length - conflicts;
-  const relationBadges = `${conflicts ? `<span class="relation-badge conflict">상충 가능 ${conflicts}</span>` : ''}${related ? `<span class="relation-badge related">관련 ${related}</span>` : ''}`;
   return `<tr data-key="${escapeHtml(item.key)}" class="${state.selected.has(item.key) ? 'selected' : ''}">
     <td class="check-cell"><input class="row-check" type="checkbox" data-key="${escapeHtml(item.key)}" ${state.selected.has(item.key) ? 'checked' : ''} aria-label="${escapeHtml(displayId)} 선택"></td>
     <td><span class="requirement-id ${item.id ? '' : 'missing'}">${escapeHtml(displayId)}</span></td>
-    <td><button class="name-button" data-open="${escapeHtml(item.key)}"><span class="requirement-name">${escapeHtml(item.name)}</span><span class="requirement-description">${escapeHtml(item.description)}</span>${relationBadges ? `<span class="relation-badges">${relationBadges}</span>` : ''}</button></td>
+    <td><button class="name-button" data-open="${escapeHtml(item.key)}"><span class="requirement-name">${escapeHtml(item.name)}</span><span class="requirement-description">${escapeHtml(item.description)}</span></button></td>
     <td><span class="category-chip cat-${escapeHtml(item.category)}">${escapeHtml(item.category)} <small>${categoryCode(item.category)}</small></span></td>
     <td><span class="priority-chip priority-${escapeHtml(item.priority)}">${escapeHtml(item.priority)}</span></td>
     <td><span class="status-chip status-${statusClass}">${escapeHtml(item.status)}</span></td>
@@ -735,12 +564,10 @@ function requirementRow(item) {
 }
 
 function mobileRequirement(item) {
-  const relations = relationsFor(item.key);
-  const conflicts = relations.filter(relation => relation.type === 'conflict').length;
   return `<article class="mobile-requirement" data-open="${escapeHtml(item.key)}">
     <div class="mobile-head"><span class="requirement-id ${item.id ? '' : 'missing'}">${escapeHtml(item.id || 'ID 없음')}</span><span><button type="button" class="flag-button ${item.flag ? `flag-${escapeHtml(item.flag)}` : ''}" data-flag-key="${escapeHtml(item.key)}" aria-label="플래그 변경">${icon('flag')}</button><span class="status-chip status-${item.status.replaceAll(' ', '-')}">${escapeHtml(item.status)}</span></span></div>
     <h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p>
-    <div class="mobile-meta"><span class="category-chip cat-${escapeHtml(item.category)}">${escapeHtml(item.category)} <small>${categoryCode(item.category)}</small></span><span class="priority-chip priority-${escapeHtml(item.priority)}">${escapeHtml(item.priority)}</span>${conflicts ? `<span class="relation-badge conflict">상충 가능 ${conflicts}</span>` : relations.length ? `<span class="relation-badge related">관련 ${relations.length}</span>` : ''}</div>
+    <div class="mobile-meta"><span class="category-chip cat-${escapeHtml(item.category)}">${escapeHtml(item.category)} <small>${categoryCode(item.category)}</small></span><span class="priority-chip priority-${escapeHtml(item.priority)}">${escapeHtml(item.priority)}</span></div>
   </article>`;
 }
 
@@ -765,18 +592,19 @@ function setDetailSectionExpanded(name, expanded) {
   const sections = {
     easy: { panel: elements.easyExplanationPanel, toggle: elements.toggleEasyExplanation, label: '쉽게 풀어보면' },
     glossary: { panel: elements.glossaryPanel, toggle: elements.toggleGlossary, label: '쉬운 용어 도우미' },
-    relations: { panel: elements.relationPanel, toggle: elements.toggleRelations, label: '관련·상충 요구사항' },
   };
   const section = sections[name];
   if (!section?.panel || !section.toggle) return;
   section.panel.classList.toggle('collapsed', !expanded);
-  section.toggle.textContent = expanded ? '−' : '+';
+  section.toggle.textContent = section.label;
   section.toggle.setAttribute('aria-expanded', String(expanded));
   section.toggle.title = `${section.label} ${expanded ? '닫기' : '열기'}`;
+  section.toggle.setAttribute('aria-label',section.toggle.title);
 }
 
-function collapseDetailSections() {
-  ['easy', 'glossary', 'relations'].forEach(name => setDetailSectionExpanded(name, false));
+function expandDetailSections() {
+  ['easy', 'glossary'].forEach(name => setDetailSectionExpanded(name, true));
+  elements.requirementForm.querySelectorAll('.detail-section').forEach(section=>section.open=true);
 }
 
 function detectUnfamiliarPhrases(text) {
@@ -991,6 +819,8 @@ function renderGlossary() {
   state.currentGlossaryTerm = null;
 }
 
+async function currentAiDisplayName(){try{const info=await window.ReqlyPersistentAI?.getConnectionInfo();return info?.connected?info.label:'AI';}catch(_){return 'AI';}}
+
 async function searchGlossaryTerm() {
   const query = elements.glossarySearchInput.value.trim();
   if (!query) {
@@ -1007,6 +837,7 @@ async function searchGlossaryTerm() {
     elements.glossarySearchButton.textContent = '검색 중…';
     elements.glossarySearchGuide.textContent = '내장 사전에 없어 외부 자료를 검색하고 RFP 문맥에 맞는 뜻을 고르는 중입니다.';
     try {
+      const model=await currentAiDisplayName();elements.glossarySearchGuide.textContent=`${model}가 RFP 문맥을 참고하여 용어의 뜻을 설명하고 있습니다.`;
       [entry] = await fetchExternalGlossary([query], source);
     } catch (error) {
       lookupError = error.message;
@@ -1046,6 +877,7 @@ async function requestGlossaryDetection() {
     elements.detectGlossaryButton.textContent = '검색 보완 중…';
     elements.glossarySearchGuide.textContent = `내장 사전에 없는 용어 ${unknownTerms.length}개를 외부 검색으로 보완하고 있습니다.`;
     try {
+      const model=await currentAiDisplayName();elements.glossarySearchGuide.textContent=`${model}가 용어 ${unknownTerms.length}개의 뜻을 설명하고 있습니다.`;
       state.remoteGlossary = await fetchExternalGlossary(unknownTerms, source);
       renderGlossary();
     } catch (error) {
@@ -1188,6 +1020,7 @@ async function requestEasyExplanation() {
   const feedback = document.getElementById('easyExplanationFeedback');
   feedback.textContent = 'AI가 원문을 해석하고 있습니다. 완료될 때까지 잠시 기다려 주세요.';
   try {
+    const model=await currentAiDisplayName();feedback.textContent=`${model}가 원문을 해석하고 있습니다. 완료될 때까지 잠시 기다려 주세요.`;
     const previous = state.requirements.find(item => item.key === state.editingKey);
     const response = await fetch('/api/explain', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1224,167 +1057,27 @@ async function requestEasyExplanation() {
   }
 }
 
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+let savedEditorSnapshot = '';
+function editorSnapshot() {
+  return JSON.stringify({fields:[...elements.requirementForm.elements].filter(input=>input.id.startsWith('form')).map(input=>[input.id,input.value]).sort((a,b)=>a[0].localeCompare(b[0])),questions:state.draftQuestions,glossary:state.draftGlossary});
 }
-
-function uniqueMatches(text, patterns) {
-  const matches = [];
-  patterns.forEach(pattern => {
-    for (const match of String(text || '').matchAll(new RegExp(pattern.source, pattern.flags))) {
-      const value = match[0].trim();
-      if (value && !matches.some(existing => existing.toLowerCase() === value.toLowerCase())) matches.push(value);
-    }
-  });
-  return matches;
+async function confirmEditorLeave() {
+  if (!elements.detailDrawer.classList.contains('open') || !savedEditorSnapshot || editorSnapshot() === savedEditorSnapshot) return true;
+  return window.ReqlyDesign ? window.ReqlyDesign.confirm('작성 중인 내용이 있습니다','저장하지 않은 변경사항을 버리고 이동할까요?') : window.confirm('저장하지 않은 변경사항을 버리고 이동할까요?');
 }
-
-function comparisonHighlights(left, right, relation) {
-  const result = {
-    left: { topic: [], conflict: [] },
-    right: { topic: [], conflict: [] },
-  };
-  if (relation?.type !== 'conflict') return result;
-
-  const rightTokens = relationTokens(right);
-  const fallbackTopics = [...relationTokens(left)].filter(token => rightTokens.has(token)).slice(0, 6);
-  const topics = (relation.topics?.length ? relation.topics : fallbackTopics).filter(Boolean);
-  result.left.topic.push(...topics);
-  result.right.topic.push(...topics);
-
-  const leftText = `${left.name || ''} ${left.description || ''}`;
-  const rightText = `${right.name || ''} ${right.description || ''}`;
-  const leftConstraints = numericConstraints(leftText);
-  const rightConstraints = numericConstraints(rightText);
-  leftConstraints.forEach(first => rightConstraints.forEach(second => {
-    if (first.unit !== second.unit || first.direction === second.direction) return;
-    const minimum = first.direction === 'min' ? first : second;
-    const maximum = first.direction === 'max' ? first : second;
-    if (minimum.value <= maximum.value) return;
-    result.left.conflict.push(first.raw);
-    result.right.conflict.push(second.raw);
-  }));
-
-  const negativePatterns = [
-    /(?:허용|사용|저장|제공|지원|수집)하지\s*않아야(?:\s*한다)?/gi,
-    /접근할\s*수\s*없(?:다|어야|음)?/gi,
-    /(?:허용|사용|저장|제공|지원|수집)하지/gi,
-    /하지\s*않아야(?:\s*한다)?/gi,
-    /금지|불가|제외/gi,
-  ];
-  const positivePatterns = [
-    /필수|반드시/gi,
-    /허용(?!하지)|사용(?!하지)|저장(?!하지)|제공(?!하지)|지원(?!하지)|수집(?!하지)/gi,
-    /접근\s*가능|포함/gi,
-  ];
-  const optionalPatterns = [/선택|권고|필요\s*시/gi];
-  const leftNegative = uniqueMatches(leftText, negativePatterns);
-  const rightNegative = uniqueMatches(rightText, negativePatterns);
-  const leftPositive = uniqueMatches(leftText, positivePatterns);
-  const rightPositive = uniqueMatches(rightText, positivePatterns);
-  if (leftNegative.length && rightPositive.length) {
-    result.left.conflict.push(...leftNegative);
-    result.right.conflict.push(...rightPositive);
-  }
-  if (rightNegative.length && leftPositive.length) {
-    result.right.conflict.push(...rightNegative);
-    result.left.conflict.push(...leftPositive);
-  }
-
-  const leftRequired = uniqueMatches(leftText, [/필수|반드시/gi]);
-  const rightRequired = uniqueMatches(rightText, [/필수|반드시/gi]);
-  const leftOptional = uniqueMatches(leftText, optionalPatterns);
-  const rightOptional = uniqueMatches(rightText, optionalPatterns);
-  if (leftRequired.length && rightOptional.length) {
-    result.left.conflict.push(...leftRequired);
-    result.right.conflict.push(...rightOptional);
-  }
-  if (rightRequired.length && leftOptional.length) {
-    result.right.conflict.push(...rightRequired);
-    result.left.conflict.push(...leftOptional);
-  }
-
-  ['left', 'right'].forEach(side => ['topic', 'conflict'].forEach(type => {
-    result[side][type] = [...new Set(result[side][type].filter(Boolean))];
-  }));
-  return result;
-}
-
-function highlightComparisonText(value, highlights = {}) {
-  const types = new Map();
-  (highlights.topic || []).forEach(term => types.set(String(term).toLowerCase(), 'topic-mark'));
-  (highlights.conflict || []).forEach(term => types.set(String(term).toLowerCase(), 'conflict-mark'));
-  const terms = [...types.keys()].filter(Boolean).sort((a, b) => b.length - a.length);
-  if (!terms.length) return escapeHtml(value || '');
-  const pattern = new RegExp(`(${terms.map(escapeRegExp).join('|')})`, 'gi');
-  return String(value || '').split(pattern).map(part => {
-    const className = types.get(part.toLowerCase());
-    return className ? `<mark class="${className}">${escapeHtml(part)}</mark>` : escapeHtml(part);
-  }).join('');
-}
-
-function comparisonCardMarkup(item, role, highlights = {}) {
-  return `<header><span class="compare-role">${role}</span><span class="category-chip cat-${escapeHtml(item.category)}">${escapeHtml(item.category)} <small>${categoryCode(item.category)}</small></span></header>
-    <dl>
-      <div><dt>요구사항 ID</dt><dd><span class="requirement-id ${item.id ? '' : 'missing'}">${escapeHtml(item.id || 'ID 없음')}</span></dd></div>
-      <div class="compare-wide"><dt>요구사항 명칭</dt><dd class="compare-name">${highlightComparisonText(item.name, highlights)}</dd></div>
-      <div class="compare-wide"><dt>상세 설명</dt><dd class="compare-description">${highlightComparisonText(item.description || '상세 설명이 없습니다.', highlights)}</dd></div>
-    </dl>`;
-}
-
-function openRelationComparison(targetKey) {
-  const current = state.requirements.find(item => item.key === state.editingKey);
-  const target = state.requirements.find(item => item.key === targetKey);
-  if (!current || !target) return;
-  const relation = relationsFor(current.key).find(item => item.key === target.key);
-  const isConflict = relation?.type === 'conflict';
-  elements.compareType.textContent = isConflict ? '상충 가능 요구사항' : '관련 요구사항';
-  elements.compareType.className = `compare-type ${isConflict ? 'conflict' : 'related'}`;
-  elements.relationCompareModal.classList.toggle('conflict', isConflict);
-  elements.compareTitle.textContent = `${current.id || '현재 항목'} ↔ ${target.id || '비교 항목'}`;
-  elements.compareReason.textContent = relation?.reason || '두 요구사항의 조건과 상세 내용을 직접 비교해 주세요.';
-  const highlights = comparisonHighlights(current, target, relation);
-  elements.compareHighlightLegend.setAttribute('aria-hidden', isConflict ? 'false' : 'true');
-  elements.compareCurrentCard.innerHTML = comparisonCardMarkup(current, '현재 요구사항', highlights.left);
-  elements.compareTargetCard.innerHTML = comparisonCardMarkup(target, isConflict ? '상충 가능 요구사항' : '관련 요구사항', highlights.right);
-  elements.relationCompareModal.classList.add('open');
-  elements.relationCompareModal.setAttribute('aria-hidden', 'false');
-  setTimeout(() => elements.compareClose.focus(), 0);
-}
-
-function closeRelationComparison() {
-  elements.relationCompareModal.classList.remove('open');
-  elements.relationCompareModal.setAttribute('aria-hidden', 'true');
-}
-
-function renderRelations(key) {
-  const relations = key ? relationsFor(key) : [];
-  elements.relationPanel.classList.toggle('visible', relations.length > 0);
-  elements.relationCount.textContent = relations.length;
-  if (!relations.length) {
-    elements.relationList.innerHTML = '<p class="relation-empty">현재 내용에서 뚜렷한 관련·상충 후보를 찾지 못했습니다.</p>';
-    return;
-  }
-  const byKey = new Map(state.requirements.map(item => [item.key, item]));
-  elements.relationList.innerHTML = relations.map(relation => {
-    const target = byKey.get(relation.key);
-    if (!target) return '';
-    const label = relation.type === 'conflict' ? '상충 가능' : '관련';
-    return `<button type="button" class="relation-item ${relation.type}" data-compare-related="${escapeHtml(target.key)}">
-      <span class="relation-type">${label}</span>
-      <span class="relation-copy"><strong>${escapeHtml(target.id || 'ID 없음')} · ${escapeHtml(target.name)}</strong><small>${escapeHtml(relation.reason)}</small></span>
-      <span class="relation-compare-action">직접 비교</span>${icon('copy')}
-    </button>`;
-  }).join('');
-}
-
-function openDrawer(key = null) {
+async function openDrawer(key = null, force = false) {
+  if (!force && !(await confirmEditorLeave())) return;
   state.editingKey = key;
   const item = key ? state.requirements.find(req => req.key === key) : normalizeRequirement({
     id: '', category: '기능', name: '', description: '', priority: '보통', status: '검토 전',
     confidence: 100, source: '수동 추가', acceptance: '미검토', completion: '미완료', tags: [],
   });
   if (!item) return;
+  state.editingRevision=item.revision||0;
+  const lastSaved=document.getElementById('lastSavedAt');
+  if(lastSaved)lastSaved.textContent=`마지막 저장: ${item.savedAt?new Date(item.savedAt).toLocaleString('ko-KR'):'없음'}`;
+  if(lastSaved)lastSaved.dataset.savedLabel=lastSaved.textContent;
+  document.getElementById('latestSavedButton').hidden=!window.ReqlyShared?.enabled;
   state.draftQuestions = (item.questions || []).map(question => ({ ...question }));
   state.draftGlossary = (item.manualGlossary || []).map(entry => ({ ...entry, manual: true }));
   state.draftExplanationSources = [...(item.explanationSources || [])];
@@ -1396,6 +1089,12 @@ function openDrawer(key = null) {
   elements.formCategory.value = item.category;
   elements.formName.value = item.name;
   elements.formDescription.value = item.description;
+  elements.formDescription.readOnly = Boolean(key);
+  document.getElementById('descriptionInputLabel').hidden = Boolean(key);
+  document.getElementById('descriptionReader').hidden = !key;
+  renderDescriptionReader(item.description);
+  const sourceDetails=document.getElementById('latestRfpSource');sourceDetails.hidden=!item.latestSource&&!item.absentInLatest;
+  document.getElementById('latestRfpSourceText').textContent=item.absentInLatest?'이번 분석에서 같은 ID를 찾지 못했습니다. 기존 작업 내용은 보존되어 있습니다.':item.latestSource?`${item.sourceChanged?'원문 변경이 감지되었습니다.':'최근 RFP 원문입니다.'}\n${item.latestSource.id||''} · ${item.latestSource.name||''}\n\n${item.latestSource.description||''}`:'';
   elements.formEasyExplanation.value = item.easyExplanation;
   elements.formPriority.value = item.priority;
   elements.formStatus.value = item.status;
@@ -1408,7 +1107,7 @@ function openDrawer(key = null) {
   elements.formOwner.value = item.owner;
   elements.formChangeHistory.value = item.changeHistory;
   elements.glossarySearchInput.value = '';
-  elements.glossarySearchGuide.textContent = '궁금한 용어를 직접 검색하거나 ‘용어 감지 요청’을 눌러 주세요. AI 도우미가 연결된 경우에는 정확한 뜻을 고르기 위해 현재 요구사항 문맥도 함께 전송될 수 있습니다.';
+  elements.glossarySearchGuide.textContent = '궁금한 용어를 직접 검색하거나 ‘용어 감지 요청’을 눌러 주세요.';
   state.glossaryDetectionRequested = false;
   state.visibleGlossary = [];
   state.remoteGlossary = [];
@@ -1420,17 +1119,23 @@ function openDrawer(key = null) {
   renderEasyExplanation();
   renderGlossary();
   renderQuestions();
-  renderRelations(key);
-  collapseDetailSections();
+  expandDetailSections();
   elements.drawerBackdrop.classList.add('open');
   elements.detailDrawer.classList.add('open');
   elements.detailDrawer.setAttribute('aria-hidden', 'false');
+  $('lastSavedAt').classList.remove('unsaved-state');
+  document.querySelector('.content-card').classList.remove('full-list');
+  if ($('listViewToggle')) $('listViewToggle').textContent='전체 표 보기';
+  savedEditorSnapshot = editorSnapshot();
+  renderWorkbenchList();
+  window.ReqlyDesign?.sync();
+  if (matchMedia('(max-width:700px)').matches) elements.detailDrawer.scrollIntoView({block:'start'});
   // Do not force focus after the drawer animation. In Korean IME environments,
   // moving focus asynchronously can commit a pending composition twice.
 }
 
-function closeDrawer() {
-  closeRelationComparison();
+async function closeDrawer(force = false) {
+  if (force !== true && !(await confirmEditorLeave())) return;
   elements.drawerBackdrop.classList.remove('open');
   elements.detailDrawer.classList.remove('open');
   elements.detailDrawer.setAttribute('aria-hidden', 'true');
@@ -1441,6 +1146,33 @@ function closeDrawer() {
   state.remoteGlossary = [];
   state.draftExplanationSources = [];
   state.glossaryDetectionRequested = false;
+  savedEditorSnapshot = '';
+  renderWorkbenchList();
+  window.ReqlyDesign?.sync();
+}
+
+async function refreshSavedEditor(key) {
+  const scroll=elements.requirementForm.querySelector('.drawer-scroll'),position=scroll.scrollTop;
+  const details=[...scroll.querySelectorAll('details')].map(node=>[node,node.open]);
+  const expanded={easy:!elements.easyExplanationPanel.classList.contains('collapsed'),glossary:!elements.glossaryPanel.classList.contains('collapsed')};
+  await openDrawer(key,true);
+  details.forEach(([node,open])=>node.open=open);Object.entries(expanded).forEach(([name,open])=>setDetailSectionExpanded(name,open));scroll.scrollTop=position;
+}
+
+// Reflow PDF line wrapping for reading only. Stored source text stays unchanged.
+function renderDescriptionReader(text) {
+  const reader=document.getElementById('descriptionReader');
+  if(!reader)return;
+  const paragraphs=[];
+  for(const raw of String(text||'').replace(/\r\n?/g,'\n').split('\n')){
+    const line=raw.trim();
+    if(!line){if(paragraphs.at(-1)!=='')paragraphs.push('');continue;}
+    const startsItem=/^(?:[□■▪▫○●◦⚬•※▶▷◆◇◎*-]|ㅇ\s|\d+[.)]|[가-힣][.)]|\([\d가-힣]+\))\s*/.test(line);
+    const prev=paragraphs.at(-1);
+    if(!prev||startsItem||/[.!?。:：]$/.test(prev)||/(?:다|함|됨|음|것|요)\s*$/.test(prev))paragraphs.push(line);
+    else paragraphs[paragraphs.length-1]+=' '+line;
+  }
+  reader.replaceChildren(...paragraphs.filter(Boolean).map(text=>{const p=document.createElement('p');p.textContent=text;return p;}));
 }
 
 function updateCounts() {
@@ -1448,12 +1180,13 @@ function updateCounts() {
   elements.descriptionCount.textContent = elements.formDescription.value.length;
 }
 
-function saveRequirement(event) {
+async function saveRequirement(event) {
   event.preventDefault();
   const id = elements.formId.value.trim();
   const duplicate = id && state.requirements.some(item => item.id.toLocaleLowerCase('ko') === id.toLocaleLowerCase('ko') && item.key !== state.editingKey);
   if (duplicate) {
     elements.idError.textContent = '이미 사용 중인 고유번호입니다.';
+    const section=elements.formId.closest('details');if(section)section.open=true;
     elements.formId.focus();
     return;
   }
@@ -1461,7 +1194,7 @@ function saveRequirement(event) {
   const previous = state.requirements.find(item => item.key === state.editingKey);
   const nextSourceOrder = state.requirements.reduce((max, item) => Math.max(max, Number(item.sourceOrder) || 0), 0) + 1;
   const requirement = normalizeRequirement({
-    ...(previous || {}), key: previous?.key || makeKey(), id,
+    ...(previous || {}), key: previous?.key || makeKey(), id, revision:state.editingRevision||0,
     sourceOrder: previous?.sourceOrder ?? nextSourceOrder,
     name: elements.formName.value.trim(), description: elements.formDescription.value.trim(),
     easyExplanation: elements.formEasyExplanation.value.trim(),
@@ -1475,26 +1208,36 @@ function saveRequirement(event) {
     manualGlossary: state.draftGlossary,
     questions: state.draftQuestions.filter(question => question.question.trim()).map(question => ({ ...question, question: question.question.trim(), answer: question.answer.trim() })),
   });
+  if(window.ReqlyShared?.enabled){
+    const button=elements.requirementForm.querySelector('[type="submit"]');button.disabled=true;
+    try { await window.ReqlyShared.saveItems([requirement]); render(); await refreshSavedEditor(requirement.key); showToast('요구사항을 저장했습니다', requirement.name); }
+    catch(error){showToast('저장하지 못했습니다',error.message,true);}
+    finally{button.disabled=false;}
+    return;
+  }
+  requirement.savedAt=new Date().toISOString();
   if (previous) state.requirements = state.requirements.map(item => item.key === previous.key ? requirement : item);
   else state.requirements.push(requirement);
-  saveWorkspace(); render(); closeDrawer();
+  saveWorkspace(); render(); await refreshSavedEditor(requirement.key);
   showToast(previous ? '요구사항을 수정했습니다' : '요구사항을 추가했습니다', `${requirement.id || 'ID 없음'} · ${requirement.name}`);
 }
 
-function deleteRequirement(key = state.editingKey) {
+async function deleteRequirement(key = state.editingKey) {
   const item = state.requirements.find(req => req.key === key);
-  if (!item || !window.confirm(`${item.id || item.name} 요구사항을 삭제할까요?`)) return;
+  if (!item || !(await (window.ReqlyDesign?.confirm('요구사항 삭제',`${item.id || item.name} 요구사항을 삭제할까요?`) ?? window.confirm(`${item.id || item.name} 요구사항을 삭제할까요?`)))) return;
+  if(window.ReqlyShared?.enabled){try{await window.ReqlyShared.deleteItems([item]);await closeDrawer(true);render();}catch(error){showToast('삭제하지 못했습니다',error.message,true);}return;}
   state.requirements = state.requirements.filter(req => req.key !== key);
-  state.selected.delete(key); saveWorkspace(); render(); closeDrawer();
+  state.selected.delete(key); saveWorkspace(); render(); closeDrawer(true);
   showToast('요구사항을 삭제했습니다', `${item.id || item.name} 항목이 목록에서 제거되었습니다.`);
 }
 
-function duplicateRequirement() {
+async function duplicateRequirement() {
   const item = state.requirements.find(req => req.key === state.editingKey);
   if (!item) return;
+  if (!(await confirmEditorLeave())) return;
   const nextSourceOrder = state.requirements.reduce((max, requirement) => Math.max(max, Number(requirement.sourceOrder) || 0), 0) + 1;
   const copy = normalizeRequirement({ ...item, key: makeKey(), sourceOrder: nextSourceOrder, id: '', name: `${item.name} (복사본)`, status: '검토 전', flag: '', completion: '미완료', createdAt: new Date().toISOString() });
-  state.requirements.push(copy); saveWorkspace(); render(); closeDrawer(); openDrawer(copy.key);
+  state.requirements.push(copy); saveWorkspace(); render(); openDrawer(copy.key, true);
   showToast('요구사항을 복제했습니다', '원문에 없는 ID는 만들지 않았습니다. 필요하면 RFP의 ID를 직접 입력하세요.');
 }
 
@@ -1515,13 +1258,14 @@ function validateFiles(files) {
   return true;
 }
 
-async function enrichWithReferences(files, notify = true) {
+async function enrichWithReferences(files, notify = true, alreadyStored = false) {
   const list = Array.from(files || []);
   if (!list.length || !validateFiles(list)) return false;
   if (!state.requirements.length) {
     showToast('먼저 RFP를 업로드해 주세요', 'RFP 요구사항을 분석한 뒤 관련 자료를 연결할 수 있습니다.', true);
     return false;
   }
+  if(!alreadyStored&&window.ReqlyFiles){window.ReqlyFiles.setProject(state.projectId);for(const file of list)await window.ReqlyFiles.add(file,'reference');}
   const formData = new FormData();
   formData.append('projectId', state.projectId);
   list.forEach(file => formData.append('references', file, file.name));
@@ -1530,28 +1274,45 @@ async function enrichWithReferences(files, notify = true) {
   if (!response.ok) throw new Error(payload.error || '관련 자료를 분석할 수 없습니다.');
 
   const merged = [...state.references, ...(payload.references || [])];
+  if(window.ReqlyFiles){const assets=await window.ReqlyFiles.list();merged.forEach(reference=>{const asset=assets.filter(file=>file.kind==='reference'&&file.name===reference.name&&file.size===reference.size).at(-1);if(asset&&!reference.assetId)reference.assetId=asset.id;});}
   state.references = merged.filter((item, index) => merged.findIndex(other => other.name === item.name && other.size === item.size) === index);
-  saveWorkspace(); render();
+  if(window.ReqlyShared?.enabled)await window.ReqlyShared.saveItems([],{document:state.document,references:state.references});
+  else saveWorkspace();
+  render();
   if (notify) showToast('관련 자료를 연결했습니다', `${list.length}개 자료는 쉬운 설명을 요청할 때 필요한 항목에만 반영됩니다.`);
   return true;
 }
 
-async function analyzeFiles(files) {
+async function analyzeFiles(files, storedAssetId = '') {
   const list = Array.from(files || []);
   if (!list.length || !validateFiles(list)) return;
+  if (!(await confirmEditorLeave())) return;
   const [file, ...references] = list;
   const extension = file.name.split('.').pop().toLowerCase();
   showAnalysis(references.length ? `${file.name} 외 ${references.length}개 자료` : file.name);
   try {
+    let assetId=storedAssetId;
+    if(!assetId&&window.ReqlyFiles){
+      window.ReqlyFiles.setProject(state.projectId);
+      const stored=await window.ReqlyFiles.add(file,'rfp');
+      assetId=window.ReqlyShared?.enabled ? stored.workspace.assets.at(-1).id : stored.id;
+    }
     const response = await fetch('/api/analyze', {
       method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name), 'X-Project-Id': state.projectId }, body: file,
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || '문서를 분석할 수 없습니다.');
-    state.document = { ...payload.document, demo: false };
-    state.requirements = (payload.requirements || []).map(normalizeRequirement);
-    state.references = [];
-    state.selected.clear(); resetFilters(false); saveWorkspace();
+    const incoming=(payload.requirements || []).map(normalizeRequirement);
+    const merged=window.ReqlySharedCore.mergeAnalysis(state.requirements,incoming,assetId||file.name);
+    if(merged.unresolved.length){
+      throw new Error(`ID 대응이 불명확한 항목 ${merged.unresolved.length}개가 있습니다. 기존 내용은 유지했습니다. 현재 버전에서는 ID를 확인한 뒤 다시 분석해 주세요.`);
+    }
+    const documentInfo={...payload.document,demo:false,assetId,overviewByAsset:state.document?.overviewByAsset||{}};
+    if(window.ReqlyShared?.enabled) await window.ReqlyShared.saveItems(merged.requirements,{document:documentInfo,references:state.references});
+    state.document = documentInfo;
+    state.requirements = (window.ReqlyShared?.enabled ? window.ReqlyShared.project.workspace.requirements : merged.requirements).map(normalizeRequirement);
+    state.selected.clear(); resetFilters(false); if(!window.ReqlyShared?.enabled)saveWorkspace();
+    await closeDrawer(true);
     if (references.length) {
       elements.analysisTitle.textContent = '관련 자료를 연결하고 있습니다';
       elements.analysisSubtitle.textContent = '회의록·녹취록·참고자료에서 요구사항과 연관된 내용을 찾는 중입니다.';
@@ -1620,24 +1381,13 @@ function exportRequirements(format) {
   const filename = (state.document?.name || 'rfp_requirements').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_');
   let content, mime, extension;
   if (format === 'json') {
-    const requirements = state.requirements.map(item => ({
-      ...item,
-      relationCandidates: relationsFor(item.key).map(relation => ({
-        ...relation,
-        targetId: state.requirements.find(target => target.key === relation.key)?.id || '',
-        targetName: state.requirements.find(target => target.key === relation.key)?.name || '',
-      })),
-    }));
+    const requirements = state.requirements;
     content = JSON.stringify({ document: state.document, references: state.references, exportedAt: new Date().toISOString(), requirements }, null, 2);
     mime = 'application/json;charset=utf-8'; extension = 'json';
   } else {
-    const headers = ['RFP 원문 순서', '요구사항 ID', '요구사항 분류', '분류코드', '요구사항 명칭', '상세설명', '쉬운 설명', '설명 참고자료', '수동 용어사전', '우선순위', '검토상태', '플래그', '관련·상충 후보', '수용여부', '적용방안', '담당자(소속)', '변경이력', '완료여부', '원문위치', '분류신뢰도', '태그'];
+    const headers = ['RFP 원문 순서', '요구사항 ID', '요구사항 분류', '분류코드', '요구사항 명칭', '상세설명', '쉬운 설명', '설명 참고자료', '수동 용어사전', '우선순위', '검토상태', '플래그', '수용여부', '적용방안', '담당자(소속)', '변경이력', '완료여부', '원문위치', '분류신뢰도', '태그'];
     const rows = state.requirements.slice().sort((a, b) => a.sourceOrder - b.sourceOrder).map(item => {
-      const related = relationsFor(item.key).map(relation => {
-        const target = state.requirements.find(candidate => candidate.key === relation.key);
-        return `${relation.type === 'conflict' ? '상충 가능' : '관련'}: ${target?.id || target?.name || relation.key} (${relation.reason})`;
-      }).join('|');
-      return [item.sourceOrder, item.id, item.category, categoryCode(item.category), item.name, item.description, item.easyExplanation, (item.explanationSources || []).join('|'), (item.manualGlossary || []).map(entry => `${entry.term}: ${entry.meaning}`).join('|'), item.priority, item.status, FLAG_LABELS[item.flag] || '', related, item.acceptance, item.applicationPlan, item.owner, item.changeHistory, item.completion, item.source, `${item.confidence}%`, (item.tags || []).join('|')];
+      return [item.sourceOrder, item.id, item.category, categoryCode(item.category), item.name, item.description, item.easyExplanation, (item.explanationSources || []).join('|'), (item.manualGlossary || []).map(entry => `${entry.term}: ${entry.meaning}`).join('|'), item.priority, item.status, FLAG_LABELS[item.flag] || '', item.acceptance, item.applicationPlan, item.owner, item.changeHistory, item.completion, item.source, `${item.confidence}%`, (item.tags || []).join('|')];
     });
     const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
     content = '\ufeff' + [headers, ...rows].map(row => row.map(quote).join(',')).join('\r\n');
@@ -1697,12 +1447,10 @@ function bindEvents() {
   elements.fileInput.addEventListener('change', event => event.target.files.length && analyzeFiles(event.target.files));
   elements.referenceButton.addEventListener('click', () => elements.referenceInput.click());
   elements.referenceInput.addEventListener('change', event => event.target.files.length && analyzeReferenceFiles(event.target.files));
-  elements.sampleButton.addEventListener('click', () => loadSample(true));
-  elements.emptySample.addEventListener('click', () => loadSample(true));
   elements.addButton.addEventListener('click', () => openDrawer());
-  elements.drawerClose.addEventListener('click', closeDrawer);
-  elements.drawerBackdrop.addEventListener('click', closeDrawer);
-  elements.cancelButton.addEventListener('click', closeDrawer);
+  elements.drawerClose.addEventListener('click', () => closeDrawer());
+  elements.drawerBackdrop.addEventListener('click', () => closeDrawer());
+  elements.cancelButton.addEventListener('click', () => closeDrawer());
   elements.requirementForm.addEventListener('submit', saveRequirement);
   elements.deleteButton.addEventListener('click', () => deleteRequirement());
   elements.duplicateButton.addEventListener('click', duplicateRequirement);
@@ -1728,7 +1476,6 @@ function bindEvents() {
   elements.regenerateEasyExplanation.addEventListener('click', requestEasyExplanation);
   elements.toggleEasyExplanation.addEventListener('click', () => setDetailSectionExpanded('easy', elements.easyExplanationPanel.classList.contains('collapsed')));
   elements.toggleGlossary.addEventListener('click', () => setDetailSectionExpanded('glossary', elements.glossaryPanel.classList.contains('collapsed')));
-  elements.toggleRelations.addEventListener('click', () => setDetailSectionExpanded('relations', elements.relationPanel.classList.contains('collapsed')));
   elements.addDirectQuestion.addEventListener('click', addDirectQuestion);
   document.querySelector('.question-actions').addEventListener('click', event => {
     const button = event.target.closest('[data-add-question]');
@@ -1784,16 +1531,6 @@ function bindEvents() {
     if (flagButton) { updateRequirementFlag(flagButton.dataset.flagKey); return; }
     const opener = event.target.closest('[data-open]'); if (opener) openDrawer(opener.dataset.open);
   });
-  elements.relationList.addEventListener('click', event => {
-    const button = event.target.closest('[data-compare-related]');
-    if (!button) return;
-    openRelationComparison(button.dataset.compareRelated);
-  });
-  elements.compareClose.addEventListener('click', closeRelationComparison);
-  elements.compareDone.addEventListener('click', closeRelationComparison);
-  elements.relationCompareModal.addEventListener('click', event => {
-    if (event.target === elements.relationCompareModal) closeRelationComparison();
-  });
   elements.requirementsBody.addEventListener('change', event => {
     const checkbox = event.target.closest('.row-check'); if (!checkbox) return;
     checkbox.checked ? state.selected.add(checkbox.dataset.key) : state.selected.delete(checkbox.dataset.key); renderRequirements(); renderBulkBar();
@@ -1801,7 +1538,7 @@ function bindEvents() {
   elements.selectAll.addEventListener('change', event => {
     filteredRequirements().forEach(item => event.target.checked ? state.selected.add(item.key) : state.selected.delete(item.key)); renderRequirements(); renderBulkBar();
   });
-  elements.bulkApply.addEventListener('click', () => {
+  elements.bulkApply.addEventListener('click', async () => {
     const priority = elements.bulkPriority.value;
     const status = elements.bulkStatus.value;
     const flagValue = elements.bulkFlag.value;
@@ -1820,11 +1557,13 @@ function bindEvents() {
       };
     });
     elements.bulkPriority.value = ''; elements.bulkStatus.value = ''; elements.bulkFlag.value = '';
-    saveWorkspace(); render(); showToast('선택 항목을 일괄 변경했습니다', `${count}개 요구사항에 선택한 값을 적용했습니다.`);
+    try{await saveWorkspace(); render(); showToast('선택 항목을 일괄 변경했습니다', `${count}개 요구사항에 선택한 값을 적용했습니다.`);}catch(error){showToast('일괄 저장하지 못했습니다',error.message,true);}
   });
-  elements.bulkDelete.addEventListener('click', () => {
-    if (!state.selected.size || !window.confirm(`선택한 ${state.selected.size}개 요구사항을 삭제할까요?`)) return;
-    const count = state.selected.size; state.requirements = state.requirements.filter(item => !state.selected.has(item.key)); state.selected.clear();
+  elements.bulkDelete.addEventListener('click', async () => {
+    if (!state.selected.size || !(await (window.ReqlyDesign?.confirm('선택한 요구사항 삭제',`선택한 ${state.selected.size}개 요구사항을 삭제할까요?`) ?? window.confirm(`선택한 ${state.selected.size}개 요구사항을 삭제할까요?`)))) return;
+    if(window.ReqlyShared?.enabled){const removesCurrent=state.selected.has(state.editingKey);try{await window.ReqlyShared.deleteItems(state.requirements.filter(item=>state.selected.has(item.key)));state.selected.clear();if(removesCurrent)await closeDrawer(true);render();}catch(error){showToast('삭제하지 못했습니다',error.message,true);}return;}
+    const count = state.selected.size; const removesCurrent=state.selected.has(state.editingKey); state.requirements = state.requirements.filter(item => !state.selected.has(item.key)); state.selected.clear();
+    if(removesCurrent)await closeDrawer(true);
     saveWorkspace(); render(); showToast('선택 항목을 삭제했습니다', `${count}개 요구사항이 제거되었습니다.`);
   });
   document.querySelectorAll('.sort-button').forEach(button => button.addEventListener('click', () => {
@@ -1845,7 +1584,7 @@ function bindEvents() {
     document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item === button));
     const view = button.dataset.view;
     const target = view === 'dashboard' ? document.querySelector('.metric-grid') : view === 'documents' ? elements.documentBanner : document.querySelector('.content-card');
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     elements.sidebar.classList.remove('open'); elements.mobileScrim.classList.remove('open');
   }));
   ['dragenter', 'dragover'].forEach(type => elements.documentBanner.addEventListener(type, event => { event.preventDefault(); elements.documentBanner.classList.add('dragging'); }));
@@ -1858,8 +1597,7 @@ function bindEvents() {
   document.addEventListener('keydown', event => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); elements.searchInput.focus(); }
     if (event.key === 'Escape') {
-      if (elements.relationCompareModal.classList.contains('open')) closeRelationComparison();
-      else closeDrawer();
+      closeDrawer();
     }
   });
 }
@@ -1868,14 +1606,56 @@ async function init() {
   cacheElements();
   elements.formCategory.innerHTML = CATEGORIES.map(item => `<option value="${item.name}">${item.name} (${item.code})</option>`).join('');
   bindEvents();
+  document.getElementById('latestSavedButton').onclick=()=>{
+    openDrawer(state.editingKey);
+  };
   try {
     const boot = await window.ReqlyPortal.start();
     restoreWorkspace(boot.workspace);
+    window.ReqlyFiles?.setProject(state.projectId);
+    window.ReqlyFiles?.installUi();
+    if(window.ReqlyShared?.enabled){
+      document.getElementById('clearProject').hidden=true;
+      document.querySelector('.table-footer p:last-child').textContent='항목 저장 시 공동 작업에 반영됩니다.';
+    }
     render();
+    window.ReqlyDesign?.sync();
+    if(state.requirements.length&&matchMedia('(min-width:701px)').matches)await openDrawer(state.requirements[0].key,true);
   } catch (error) {
     console.error(error);
-    window.alert(`앱을 시작하지 못했습니다: ${error.message}`);
+    if(window.ReqlyDesign)await window.ReqlyDesign.notice('프로젝트를 열지 못했습니다',error.message);
+    else window.alert(`앱을 시작하지 못했습니다: ${error.message}`);
   }
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+window.ReqlyApp={get projectId(){return state.projectId;},get document(){return state.document;},
+  openRequirement:openDrawer,
+  refreshView:render,
+  isEditorDirty(){return Boolean(savedEditorSnapshot&&elements.detailDrawer.classList.contains('open')&&editorSnapshot()!==savedEditorSnapshot);},
+  setFlag:updateRequirementFlag,
+  selectRequirement(key,checked){checked?state.selected.add(key):state.selected.delete(key);renderRequirements();renderBulkBar();},
+  stepRequirement(direction){const items=filteredRequirements();const index=items.findIndex(item=>item.key===state.editingKey);if(items.length)openDrawer(items[(index+direction+items.length)%items.length].key);},
+  async saveOverview(assetId,result,expectedSavedAt){
+    const existing=state.document?.overviewByAsset?.[assetId];
+    if((existing?.savedAt||'')!==(expectedSavedAt||''))throw new Error('다른 사람이 사업 정보를 먼저 저장했습니다. 최신 결과를 확인해 주세요.');
+    const assets=await window.ReqlyFiles.list();if(!assets.some(file=>file.id===assetId&&file.kind==='rfp'))throw new Error('해당 RFP 원본을 찾을 수 없습니다.');
+    const document={...(state.document||{name:result.sourceName,type:result.sourceType,size:result.sourceSize,pages:result.pages,characters:result.characters}),overviewByAsset:{...(state.document?.overviewByAsset||{}),[assetId]:{...result,savedAt:new Date().toISOString()}}};
+    if(window.ReqlyShared?.enabled)await window.ReqlyShared.saveItems([],{document,references:state.references});
+    else{state.document=document;saveWorkspace();}
+    return state.document.overviewByAsset[assetId];
+  },analyzeRfp(file,id){return analyzeFiles([file],id);},addReferences(files){return enrichWithReferences(files,true,true);}};
+window.addEventListener('reqly-shared-update',event=>{
+  if(!elements.requirementsBody)return;
+  const workspace=event.detail.project.workspace;
+  restoreWorkspace(workspace);
+  if(!state.editingKey)render();else{renderDocument();renderReferences();renderMetrics();renderCategoryControls();renderWorkbenchList();}
+  const latest=workspace.requirements.find(item=>item.key===state.editingKey);
+  const label=document.getElementById('lastSavedAt');
+  if(label&&latest){label.textContent=`마지막 저장: ${latest.savedAt?new Date(latest.savedAt).toLocaleString('ko-KR'):'없음'}${latest.revision!==state.editingRevision?' · 최신 저장이 있음':''}`;label.dataset.savedLabel=label.textContent;window.ReqlyDesign?.markDirty();}
+});
+window.addEventListener('reqly-file-removed',event=>{
+  state.references=state.references.filter(reference=>reference.assetId!==event.detail.id);
+  saveWorkspace();renderReferences();
+});

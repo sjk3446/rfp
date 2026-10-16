@@ -3,11 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="파일을 서버에 올리지 않고 브라우저에서 분석하는 RFP 요구사항 관리 도구">
-  <title>Reqly — RFP 요구사항 관리 에이전트</title>
-  <link rel="stylesheet" href="./styles.css?v=4.0.2">
+  <meta name="description" content="RFP 요구사항과 사업 정보를 정리하고 프로젝트별 검토 내용을 관리하는 도구">
+  <title>Muhammad — RFP 요구사항 관리 에이전트</title>
+  <link rel="stylesheet" href="./styles.css?v=5.0.1">
+  <link rel="stylesheet" href="./overview.css?v=5.2.2">
+  <link rel="stylesheet" href="./file-manager.css?v=5.3.0">
+  <link rel="stylesheet" href="./workbench.css?v=6.2.1">
+  <link rel="stylesheet" href="./kasbah.css?v=6.3.1">
 </head>
-<body>
+<body class="editorial-app kasbah-theme">
   <svg class="svg-sprite" aria-hidden="true">
     <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></symbol>
@@ -36,9 +40,9 @@
 
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-      <a class="brand" href="#" aria-label="Reqly 홈">
+      <a class="brand" href="#" aria-label="Muhammad 홈">
         <span class="brand-mark"><svg><use href="#i-spark"></use></svg></span>
-        <span>reqly</span>
+        <span>Muhammad</span>
       </a>
 
       <nav class="nav-list" aria-label="주요 메뉴">
@@ -60,9 +64,9 @@
 
       <div class="privacy-card">
         <div class="privacy-icon"><svg><use href="#i-shield"></use></svg></div>
-        <div><strong>이 브라우저에만 저장</strong><p>문서와 작업 내용은 GitHub나 별도 서버에 업로드되지 않습니다.</p></div>
+        <div><strong>프로젝트 작업 관리</strong><p>중요한 작업은 백업 파일로 보관해 주세요.</p></div>
       </div>
-      <p class="version">REQly Pages · v4.0</p>
+      <p class="version">Muhammad · 6.0</p>
     </aside>
 
     <button class="mobile-scrim" id="mobileScrim" aria-label="메뉴 닫기"></button>
@@ -76,7 +80,6 @@
         <div class="top-actions">
           <button class="button ghost" id="projectButton"><svg><use href="#i-file"></use></svg><span>프로젝트</span></button>
           <button class="button ghost" id="aiSettingsButton"><svg><use href="#i-shield"></use></svg><span>AI 연결</span></button>
-          <button class="button ghost" id="sampleButton"><svg><use href="#i-spark"></use></svg><span>샘플 데이터</span></button>
           <button class="button primary" id="uploadButton"><svg><use href="#i-upload"></use></svg><span>RFP·자료 업로드</span></button>
           <input type="file" id="fileInput" hidden multiple accept=".pdf,.docx,.pptx,.hwpx,.hwp,.xlsx,.xlsm,.xls,.txt,.md,.csv,.tsv,.json,.xml">
         </div>
@@ -184,11 +187,11 @@
             <div class="empty-illustration"><svg><use href="#i-upload"></use></svg></div>
             <h3>RFP 문서에서 요구사항을 찾아드릴게요</h3>
             <p>문서를 업로드하면 RFP에 실제로 적힌 요구사항 ID, 명칭, 상세 설명과 분류를 자동으로 정리합니다. ID가 없는 항목에는 번호를 임의로 만들지 않습니다.</p>
-            <div class="empty-actions"><button class="button primary" id="emptyUpload"><svg><use href="#i-upload"></use></svg>문서 업로드</button><button class="button ghost" id="emptySample">샘플로 둘러보기</button></div>
+            <div class="empty-actions"><button class="button primary" id="emptyUpload"><svg><use href="#i-upload"></use></svg>문서 업로드</button></div>
             <span class="format-note">PDF · DOCX · PPTX · HWPX · XLSX · TXT · MD · CSV</span>
           </div>
 
-          <footer class="table-footer"><p id="resultCount">총 0개</p><p>변경 내용은 이 브라우저의 전용 저장소에 자동 저장됩니다.</p></footer>
+          <footer class="table-footer"><p id="resultCount">총 0개</p><p>편집한 내용은 저장하기를 눌러 반영해 주세요.</p></footer>
         </section>
       </div>
     </main>
@@ -211,11 +214,12 @@
           <label><span>분류 <em>*</em></span><select id="formCategory" required></select></label>
         </div>
         <label><span>요구사항 명칭 <em>*</em></span><input id="formName" required maxlength="120" placeholder="요구사항을 한 문장으로 요약하세요"><small><b id="nameCount">0</b>/120</small></label>
-        <label><span>상세 설명 <em>*</em></span><textarea id="formDescription" required rows="8" placeholder="요구사항의 조건, 기준, 예외 사항을 구체적으로 작성하세요."></textarea><small><b id="descriptionCount">0</b>자</small></label>
+        <div class="description-section"><h3>상세 설명</h3><div id="descriptionReader" class="description-reader" role="region" aria-label="상세 설명 원문"></div><label id="descriptionInputLabel" hidden><span>새 요구사항 상세 설명</span><textarea id="formDescription" required rows="8" placeholder="새 요구사항의 내용을 입력하세요."></textarea></label><small hidden><b id="descriptionCount">0</b>자</small></div>
+        <details id="latestRfpSource" hidden><summary>최근 RFP 원문 확인</summary><pre id="latestRfpSourceText" style="white-space:pre-wrap;font:inherit;line-height:1.7"></pre></details>
         <section class="easy-explanation-panel collapsible-section collapsed" id="easyExplanationPanel">
           <header class="collapsible-header"><div class="section-icon"><svg><use href="#i-spark"></use></svg></div><div><strong>쉽게 풀어보면</strong><p>RFP 원문과 연결된 관련 자료를 바탕으로, 실제로 무엇을 해야 하는지 쉬운 말로 정리합니다.</p></div><button type="button" class="section-toggle" id="toggleEasyExplanation" aria-expanded="false" aria-controls="easyExplanationBody" title="쉽게 풀어보면 열기">+</button></header>
           <div class="collapsible-body" id="easyExplanationBody">
-            <p class="easy-explanation-basis">AI가 뜻 · 해야 할 일 · 쉬운 예시 · 완료 확인 방법을 설명합니다. 요청할 때만 선택한 요구사항과 참고자료 발췌를 AI 제공업체로 전송하며, 본인의 API 사용료가 발생할 수 있습니다. 저장된 설명을 다시 읽을 때는 호출하지 않습니다.</p>
+            <p class="easy-explanation-basis">AI가 뜻 · 해야 할 일 · 쉬운 예시 · 완료 확인 방법을 설명합니다. 요청할 때만 실행하며, 본인의 API 사용료가 발생할 수 있습니다. 저장된 설명을 다시 읽을 때는 호출하지 않습니다.</p>
             <button type="button" class="button ghost" id="connectExplanationAi">AI 연결 / 설정</button>
             <p class="easy-explanation-basis" id="easyExplanationFeedback" role="status" aria-live="polite"></p>
             <div class="easy-explanation-request" id="easyExplanationRequest"><p>원문 반복이 아닌, 비개발자를 위한 AI 해설을 요청합니다.</p><button type="button" class="button primary" id="generateEasyExplanation"><svg><use href="#i-spark"></use></svg>AI로 쉽게 설명</button></div>
@@ -234,7 +238,7 @@
               <input id="glossarySearchInput" maxlength="120" aria-label="설명할 용어 직접 검색" placeholder="상세 설명의 단어나 문구를 복사해 붙여 넣으세요">
               <button type="button" id="glossarySearchButton"><svg><use href="#i-search"></use></svg>쉬운 설명 찾기</button>
             </div>
-            <p class="glossary-search-guide" id="glossarySearchGuide">궁금한 용어를 직접 검색하거나 ‘용어 감지 요청’을 눌러 주세요. 검색할 때는 용어만 외부에 전송되고 RFP 문맥은 로컬에서 사용합니다.</p>
+            <p class="glossary-search-guide" id="glossarySearchGuide">궁금한 용어를 직접 검색하거나 ‘용어 감지 요청’을 눌러 주세요.</p>
             <div class="manual-glossary-editor" id="manualGlossaryEditor">
               <label><span>용어/약자 <em>*</em></span><input id="manualTerm" maxlength="60" placeholder="예: SDV"></label>
               <label><span>영문 전체 이름</span><input id="manualFull" maxlength="140" placeholder="선택 입력"></label>
@@ -252,10 +256,6 @@
             </div>
           </div>
         </section>
-        <section class="relation-panel collapsible-section collapsed" id="relationPanel">
-          <header class="collapsible-header"><div class="relation-heading"><strong>관련·상충 요구사항</strong><span id="relationCount">0</span><p>내용이 비슷하거나 조건이 충돌할 가능성이 있는 항목을 자동으로 찾아 표시합니다.</p></div><button type="button" class="section-toggle" id="toggleRelations" aria-expanded="false" aria-controls="relationBody" title="관련·상충 요구사항 열기">+</button></header>
-          <div class="collapsible-body" id="relationBody"><div class="relation-list" id="relationList"></div></div>
-        </section>
         <div class="form-row three-col">
           <label><span>우선순위</span><select id="formPriority"><option>높음</option><option>보통</option><option>낮음</option></select></label>
           <label><span>검토 상태</span><select id="formStatus"><option>검토 전</option><option>검토 중</option><option>확정</option></select></label>
@@ -267,8 +267,11 @@
           <label><span>완료 여부</span><select id="formCompletion"><option>미완료</option><option>진행 중</option><option>완료</option></select></label>
         </div>
         <label><span>적용 방안</span><textarea id="formApplicationPlan" rows="3" maxlength="1000" placeholder="요구사항을 구현하거나 적용할 방안을 기록하세요."></textarea></label>
-        <div class="form-row two-col">
+        <div class="form-row">
+          <!-- 담당자 입력 UI는 임시 숨김. 복원 시 아래 hidden 입력 대신 이 label을 사용합니다.
           <label><span>담당자(소속)</span><input id="formOwner" maxlength="100" placeholder="예: 홍길동 (플랫폼팀)"></label>
+          -->
+          <input type="hidden" id="formOwner">
           <label><span>변경 이력</span><input id="formChangeHistory" maxlength="200" placeholder="예: v1.1 범위 조정"></label>
         </div>
         <section class="question-builder">
@@ -281,32 +284,15 @@
       </div>
       <footer class="drawer-footer">
         <div><button type="button" class="button danger-ghost" id="deleteButton"><svg><use href="#i-trash"></use></svg>삭제</button><button type="button" class="button ghost" id="duplicateButton"><svg><use href="#i-copy"></use></svg>복제</button></div>
-        <div><button type="button" class="button ghost" id="cancelButton">취소</button><button type="submit" class="button primary"><svg><use href="#i-check"></use></svg>저장하기</button></div>
+        <div><small id="lastSavedAt">마지막 저장: 없음</small><button type="button" class="button ghost" id="latestSavedButton" hidden>최신 내용 다시 열기</button><button type="button" class="button ghost" id="cancelButton">취소</button><button type="submit" class="button primary"><svg><use href="#i-check"></use></svg>저장하기</button></div>
       </footer>
     </form>
   </aside>
 
-  <div class="compare-overlay" id="relationCompareModal" aria-hidden="true">
-    <section class="compare-dialog" role="dialog" aria-modal="true" aria-labelledby="compareTitle">
-      <header class="compare-header">
-        <div><span class="compare-type" id="compareType">관련 요구사항</span><h2 id="compareTitle">요구사항 직접 비교</h2><p id="compareReason">두 요구사항의 차이를 확인하세요.</p>
-          <div class="compare-highlight-legend" id="compareHighlightLegend" aria-hidden="true"><span class="topic">공통으로 다루는 대상</span><span class="conflict">서로 맞지 않는 조건</span></div>
-        </div>
-        <button type="button" class="icon-button" id="compareClose" aria-label="비교 창 닫기"><svg><use href="#i-x"></use></svg></button>
-      </header>
-      <div class="compare-body">
-        <article class="compare-card current" id="compareCurrentCard"></article>
-        <div class="compare-divider" aria-hidden="true"><span>VS</span></div>
-        <article class="compare-card target" id="compareTargetCard"></article>
-      </div>
-      <footer class="compare-footer"><p>자동 감지 결과는 검토 보조 정보입니다. 실제 상충 여부는 원문과 발주기관의 의도를 함께 확인해 주세요.</p><button type="button" class="button primary" id="compareDone">비교 닫기</button></footer>
-    </section>
-  </div>
-
   <div class="analysis-overlay" id="analysisOverlay" aria-live="polite">
     <div class="analysis-card">
       <div class="agent-animation"><div class="orbit"></div><svg><use href="#i-spark"></use></svg></div>
-      <p class="eyebrow">REQly DOCUMENT AGENT</p><h2 id="analysisTitle">문서를 읽고 있습니다</h2><p id="analysisSubtitle">파일 구조와 텍스트를 안전하게 확인하는 중입니다.</p>
+      <p class="eyebrow">Muhammad DOCUMENT AGENT</p><h2 id="analysisTitle">문서를 읽고 있습니다</h2><p id="analysisSubtitle">파일 구조와 텍스트를 안전하게 확인하는 중입니다.</p>
       <div class="analysis-progress"><span id="analysisProgress"></span></div>
       <div class="analysis-steps">
         <span class="active"><i></i>문서 읽기</span><span><i></i>요구사항 추출</span><span><i></i>자동 분류</span><span><i></i>결과 정리</span>
@@ -320,7 +306,15 @@
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
   <script src="./document-parser.js?v=4.0.3"></script>
-  <script src="./pages-runtime.js?v=4.0.5"></script>
-  <script src="./app.js?v=4.0.5"></script>
+  <script src="./shared-core.js?v=5.0.0"></script>
+  <script src="./cloud-config.js?v=5.0.2"></script>
+  <script src="./shared-runtime.js?v=6.0.2"></script>
+  <script src="./persistent-ai.js?v=6.3.2"></script>
+  <script src="./file-runtime.js?v=6.0.2"></script>
+  <script src="./pages-runtime.js?v=6.0.5"></script>
+  <script src="./overview-core.js?v=5.2.2"></script>
+  <script src="./app.js?v=6.2.1"></script>
+  <script src="./overview-runtime.js?v=5.2.2"></script>
+  <script src="./workbench.js?v=6.3.1"></script>
 </body>
 </html>

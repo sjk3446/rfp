@@ -1,0 +1,18 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head><body>
+<script>
+// This frame hosts google.script.run, avoiding unsupported cross-origin REST calls.
+const allowedOrigin = <?!= JSON.stringify(allowedOrigin) ?>;
+const nonce = <?!= JSON.stringify(channelNonce) ?>;
+window.addEventListener('message', event => {
+  if (event.origin !== allowedOrigin || event.source !== window.top) return;
+  const message = event.data;
+  if (!nonce || !message || message.nonce !== nonce || message.channel !== 'reqly-drive-v1' || typeof message.requestId !== 'string') return;
+  google.script.run
+    .withSuccessHandler(result => window.top.postMessage({channel:'reqly-drive-v1', nonce, requestId:message.requestId, result}, allowedOrigin))
+    .withFailureHandler(() => window.top.postMessage({channel:'reqly-drive-v1', nonce, requestId:message.requestId, result:{ok:false,error:'저장소 연결을 확인해 주세요.'}}, allowedOrigin))
+    .reqlyRpc(message.request);
+});
+if (nonce && allowedOrigin) window.top.postMessage({channel:'reqly-drive-v1', nonce, ready:true}, allowedOrigin);
+</script>
+</body></html>

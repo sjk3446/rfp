@@ -1,0 +1,291 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&display=swap');
+
+/* Sahara Kasbah: clay architecture and wine portals around a quiet reading surface. */
+body.editorial-app.kasbah-theme {
+  --ink:#213b32; --muted:#626b5b; --subtle:#717760;
+  --line:#d8cba9; --line-strong:#b9a779;
+  --paper:#fbf5e5; --canvas:#eee8d5; --nav:#082f2a; --nav-muted:#f7e8c2;
+  --teal:#145344; --teal-strong:#082f2a; --teal-soft:#e8ecdd; --danger:#a13b2a;
+  --kasbah-clay:#072f2b; --kasbah-wine:#082f2a; --kasbah-wine-dark:#04231f;
+  --kasbah-gold:#c9a55e; --kasbah-on:#f7e8c2; --kasbah-field:#fffaf0;
+  --radius:2px; --shadow-lg:0 24px 75px #41182044;
+  background-color:var(--kasbah-clay);
+  background-image:repeating-linear-gradient(0deg,#ffffff04 0 1px,transparent 1px 6px);
+}
+.kasbah-theme :is(button,input,select,textarea,a,summary):focus-visible { outline-color:var(--kasbah-gold); }
+.kasbah-theme #formName:focus { outline-color:var(--kasbah-gold); }
+.kasbah-theme .topbar {
+  background:transparent;color:var(--kasbah-on);min-height:70px;
+  padding:14px 28px;border:0;
+}
+.kasbah-theme .topbar .breadcrumb { color:var(--kasbah-on);opacity:.8; }
+.kasbah-theme .topbar h1 { color:var(--kasbah-on);max-width:390px;font-size:14px; }
+.kasbah-theme .top-actions .button,
+.kasbah-theme .top-actions :is(.file-manager-button,#aiSettingsButton) {
+  background:transparent;color:var(--kasbah-on);border:1px solid #e5b25988;border-radius:0;
+  font-size:12px;min-height:36px;padding:8px 11px;
+}
+.kasbah-theme .top-actions .button:hover { background:var(--kasbah-wine);border-color:var(--kasbah-wine); }
+.kasbah-theme .top-actions #uploadButton { background:var(--kasbah-gold);color:var(--kasbah-wine-dark);border-color:var(--kasbah-gold); }
+.kasbah-theme .kasbah-masthead { position:relative;isolation:isolate;display:grid;place-items:center;min-height:150px;margin:0 28px 8px; }
+.kasbah-theme .kasbah-arcade {
+  position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background-image:radial-gradient(ellipse 31px 58px at 50% 100%,var(--kasbah-wine) 96%,transparent 100%);
+  background-size:88px 99px;background-repeat:repeat-x;background-position:left bottom;opacity:.82;
+  border-bottom:2px solid var(--kasbah-gold);
+}
+.kasbah-theme .kasbah-signature { padding:15px 28px 20px;text-align:center;background:var(--kasbah-clay);box-shadow:0 0 0 14px var(--kasbah-clay); }
+.kasbah-theme .kasbah-signature .brand { padding:0;color:var(--kasbah-on);font:600 66px/1.05 'Cormorant Garamond',Georgia,serif;letter-spacing:-2px; }
+.kasbah-theme .kasbah-tagline { display:block;margin-top:13px;color:var(--kasbah-on);font-size:10px;letter-spacing:4px; }
+.kasbah-theme .workspace-bar {
+  position:relative;margin:0 28px 26px;padding:0 22px;background:var(--kasbah-wine);
+  border-block:2px solid var(--kasbah-gold);color:var(--kasbah-on);gap:24px;
+}
+.kasbah-theme .workspace-bar::after {
+  content:'';position:absolute;left:0;right:0;top:calc(100% + 9px);height:13px;pointer-events:none;
+  background:repeating-conic-gradient(from 0deg,var(--kasbah-wine) 0 25%,var(--kasbah-gold) 0 50%) 0 0/18px 12px;
+}
+.kasbah-theme .workspace-bar .nav-list { justify-content:space-between;flex:1;gap:28px;max-width:800px; }
+.kasbah-theme .workspace-bar .nav-item { color:var(--kasbah-on);opacity:.84; }
+.kasbah-theme .workspace-bar .nav-item:hover { color:var(--kasbah-on);opacity:1; }
+.kasbah-theme .workspace-bar .nav-item.active { color:var(--kasbah-on);border-color:var(--kasbah-gold);opacity:1; }
+.kasbah-theme .workspace-bar .nav-count { background:#f6d1a324;color:var(--kasbah-on); }
+.kasbah-theme .workspace-progress { color:var(--kasbah-on); }
+.kasbah-theme .workspace-progress progress::-webkit-progress-bar { background:#ffe6bb33; }
+.kasbah-theme .workspace-progress progress::-webkit-progress-value { background:var(--kasbah-gold); }
+.kasbah-theme .page-content { padding:0 28px 28px;background:transparent; }
+.kasbah-theme .project-context { border:0;background:transparent;color:var(--kasbah-on); }
+.kasbah-theme .project-context>summary { color:var(--kasbah-on);padding:10px 0; }
+.kasbah-theme .project-context[open]>summary { border:0; }
+.kasbah-theme .project-context .document-banner { border:1px solid var(--line);background:var(--paper);color:var(--ink); }
+.kasbah-theme .project-context .reference-panel { background:var(--paper);color:var(--ink); }
+.kasbah-theme .project-context .metric-grid { padding:16px 22px;background:var(--paper);margin-bottom:10px; }
+.kasbah-theme .content-card { background:transparent; }
+.kasbah-theme .content-card>.card-header { padding:19px 0;color:var(--kasbah-on); }
+.kasbah-theme .card-header h2 { color:var(--kasbah-on);font-size:29px; }
+.kasbah-theme .card-header p { color:var(--kasbah-on);opacity:.9; }
+.kasbah-theme .card-actions .button { background:transparent;border-color:#e5b259a8;color:var(--kasbah-on);border-radius:0; }
+.kasbah-theme .card-actions .button:hover { background:var(--kasbah-wine);border-color:var(--kasbah-wine); }
+.kasbah-theme .card-actions #addButton { background:var(--kasbah-on);color:var(--kasbah-wine);border-color:var(--kasbah-on); }
+.kasbah-theme .card-actions .qa-button b { background:#ffe6bb24;color:var(--kasbah-on); }
+.kasbah-theme .classification-bar { padding:0 0 20px;background:transparent;border:0;color:var(--kasbah-on); }
+.kasbah-theme .classification-bar .category-strip { gap:8px; }
+.kasbah-theme .classification-bar .category-tab { border:1px solid #e5b259aa;border-radius:0;background:transparent;color:var(--kasbah-on); }
+.kasbah-theme .classification-bar .category-tab:hover { background:#70253844; }
+.kasbah-theme .classification-bar .category-tab.active { background:var(--kasbah-on);color:var(--kasbah-wine);border-color:var(--kasbah-on); }
+.kasbah-theme .classification-bar .category-tab small,
+.kasbah-theme .classification-bar .hierarchy-chip b { color:inherit;opacity:.9; }
+.kasbah-theme .classification-bar .hierarchy-level-label { color:var(--kasbah-on); }
+.kasbah-theme .classification-bar .id-hierarchy-filter { border-color:#e5b25970; }
+.kasbah-theme .classification-bar .id-hierarchy-head :is(strong,span),
+.kasbah-theme #idHierarchyReset { color:var(--kasbah-on); }
+.kasbah-theme .classification-bar .hierarchy-chip { background:transparent;border-color:#e5b25988;border-radius:0;color:var(--kasbah-on); }
+.kasbah-theme .classification-bar .hierarchy-chip.active { background:var(--kasbah-wine);border-color:var(--kasbah-wine);color:var(--kasbah-on); }
+.kasbah-theme .workbench { gap:20px;border:0; }
+.kasbah-theme .requirement-list-panel {
+  --ink:#ffe6bb;--muted:#f2cda7;--line:#9e5a5d;--line-strong:#b37570;--paper:#702538;--canvas:#702538;--teal:#ffe6bb;--teal-soft:#944655;
+  background:var(--kasbah-wine);border:1px solid #e5b259bb;color:var(--kasbah-on);
+}
+.kasbah-theme .requirement-list-panel .toolbar { padding:16px; }
+.kasbah-theme .requirement-list-panel .search-box { background:#ffffff09;border-color:#e5b25980;border-radius:0;color:var(--kasbah-on); }
+.kasbah-theme .requirement-list-panel .search-box :is(input,svg) { color:var(--kasbah-on); }
+.kasbah-theme .requirement-list-panel input::placeholder { color:#f0c9a8; }
+.kasbah-theme .requirement-list-panel .select-wrap select { border-color:#e5b25980;color:var(--kasbah-on);border-radius:0; }
+.kasbah-theme .requirement-list-panel .filter-toggle { border-color:#e5b25980;border-radius:0; }
+.kasbah-theme .requirement-list-panel .filter-popover select { color:#542b29;background:#fff5e0;border-color:#d8b58b;border-radius:0; }
+.kasbah-theme .requirement-record { border-left-color:transparent; }
+.kasbah-theme .requirement-record:hover { background:#ffffff0b; }
+.kasbah-theme .requirement-record.is-current {
+  --ink:#542b29;--muted:#77533e;--teal:#702538;--line:#cfac85;--paper:#f2dfbc;
+  background:var(--kasbah-on);border-left-color:var(--kasbah-gold);
+}
+.kasbah-theme .requirement-record .flag-button { background:transparent; }
+.kasbah-theme .requirement-record :is(.status-검토-중,.status-확정) { color:var(--ink); }
+.kasbah-theme .record-name { font-size:16px; }
+.kasbah-theme .requirement-list-panel .table-footer { color:var(--kasbah-on); }
+.kasbah-theme .requirement-list-panel .bulk-bar { --teal:#702538;--paper:#fff5e0;background:#ead6b6;color:#542b29;border-color:#d8b58b; }
+.kasbah-theme .workbench-editor { background:var(--paper);border:4px double var(--kasbah-gold);border-radius:48% 48% 0 0 / 28px 28px 0 0;overflow:hidden; }
+.kasbah-theme .drawer-header { padding-top:28px;background:var(--paper); }
+.kasbah-theme .drawer-header .icon-button { background:transparent;border-color:var(--line); }
+.kasbah-theme .drawer-scroll :is(input,select,textarea) { border-radius:0;background:var(--kasbah-field); }
+.kasbah-theme .drawer-scroll :is(input,select,textarea):focus { border-color:var(--teal);box-shadow:0 0 0 2px #70253820; }
+.kasbah-theme #formDescription { background:transparent;border-left-color:var(--kasbah-gold); }
+.kasbah-theme .detail-section-trigger,.kasbah-theme .panel-toggle { color:var(--teal); }
+.kasbah-theme .button,.kasbah-theme .badge,.kasbah-theme .reference-chip { border-radius:0; }
+.kasbah-theme .button:is(.primary,.dark) { background:var(--teal);border-color:var(--teal); }
+.kasbah-theme .button:is(.primary,.dark):hover { background:var(--teal-strong); }
+.kasbah-theme .source-panel { border-left-color:var(--kasbah-gold); }
+.kasbah-theme .full-list .requirement-list-panel {
+  --ink:#542b29;--muted:#7d5d4a;--line:#ddc49e;--line-strong:#c7a77e;--paper:#faedcf;--canvas:#f2dfbc;--teal:#702538;--teal-soft:#ead6b6;
+  background:var(--paper);color:var(--ink);
+}
+.kasbah-theme .full-list .requirement-list-panel .search-box { background:var(--kasbah-field);border-color:var(--line-strong); }
+.kasbah-theme .full-list .requirement-list-panel .search-box :is(input,svg),
+.kasbah-theme .full-list .requirement-list-panel .select-wrap select,
+.kasbah-theme .full-list .requirement-list-panel .table-footer { color:var(--ink); }
+.kasbah-theme .full-list .requirement-list-panel input::placeholder { color:var(--muted); }
+.kasbah-theme .full-list .requirement-list-panel .select-wrap select,
+.kasbah-theme .full-list .requirement-list-panel .filter-toggle { border-color:var(--line-strong); }
+
+/* Project, document, sharing, credentials, AI, overview and confirmation dialogs. */
+.kasbah-theme .pages-modal { background:#4116269c;backdrop-filter:blur(3px); }
+.kasbah-theme .pages-modal .pages-dialog {
+  background:var(--paper);border:4px solid var(--kasbah-wine);border-top:6px double var(--kasbah-gold);
+  border-radius:46px 46px 2px 2px;box-shadow:var(--shadow-lg);
+}
+.kasbah-theme .pages-modal .pages-dialog>header { background:var(--paper);padding-top:29px;border-color:var(--line); }
+.kasbah-theme .pages-modal .pages-dialog h2 { color:var(--kasbah-wine); }
+.kasbah-theme .pages-modal .pages-close { color:var(--kasbah-wine);background:transparent;border-color:var(--line-strong);border-radius:0; }
+.kasbah-theme .pages-modal :is(.pages-action,.project-actions button,.fm-action) { border-radius:0;background:var(--kasbah-field); }
+.kasbah-theme .pages-modal :is(.pages-action.primary,.project-actions button.primary,.fm-action-primary) { background:var(--kasbah-wine);border-color:var(--kasbah-wine);color:var(--kasbah-on); }
+.kasbah-theme .pages-modal :is(.pages-action,.fm-action):hover:not(:disabled) { background:var(--teal-soft);color:var(--teal);border-color:var(--line-strong); }
+.kasbah-theme .pages-modal :is(.pages-action.primary,.fm-action-primary):hover:not(:disabled) { background:var(--kasbah-wine-dark);color:var(--kasbah-on); }
+.kasbah-theme .pages-modal .pages-field :is(input,select) { background:var(--kasbah-field);border-radius:0;color:var(--ink); }
+.kasbah-theme .pages-modal .fm-tabs { background:var(--kasbah-wine);border-block:1px solid var(--kasbah-gold); }
+.kasbah-theme .pages-modal .fm-tabs button { color:var(--kasbah-on);opacity:.8; }
+.kasbah-theme .pages-modal .fm-tabs [aria-selected=true] { border-color:var(--kasbah-gold);color:var(--kasbah-on);opacity:1; }
+.kasbah-theme .pages-modal :is(.fm-section-heading h3 span,.fm-setting-note,.overview-results-heading p,[data-overview-filter-count]) { color:var(--muted); }
+.kasbah-theme .pages-modal .fm-file { border-left:2px solid var(--kasbah-gold);padding-left:16px; }
+.kasbah-theme .pages-modal .fm-help,
+.kasbah-theme .pages-modal :is(.pages-note,.privacy-warning) { border-radius:0;border-left-color:var(--kasbah-gold); }
+.kasbah-theme .pages-modal :is(.fm-notice,.overview-filter-panel,.overview-flow-card,.overview-ai-badge) { border-radius:0; }
+.kasbah-theme .pages-modal .fm-notice { border-color:var(--teal); }
+.kasbah-theme .pages-modal .overview-flow-card { background:var(--canvas);border-color:var(--line); }
+.kasbah-theme .pages-modal .overview-flow-card:is([data-state=paused],[data-state=preparePaused]) { background:#f3dfb5;border-color:#c7a77e; }
+.kasbah-theme .pages-modal .overview-flow-card [data-overview-status] { border-color:var(--line); }
+.kasbah-theme .pages-modal .overview-ai-badge { background:var(--canvas);color:var(--muted); }
+.kasbah-theme .pages-modal .overview-ai-badge.connected { background:var(--teal-soft);color:var(--teal); }
+.kasbah-theme .pages-modal .overview-results-heading { border-color:var(--line); }
+.kasbah-theme .pages-modal .overview-step-number { border-radius:50% 50% 0 0; }
+.kasbah-theme .pages-modal .overview-item blockquote { border-left-color:var(--kasbah-gold); }
+.kasbah-theme .pages-modal .overview-original iframe { border-color:var(--line-strong)!important; }
+.kasbah-theme .analysis-overlay { background:#4116269c; }
+.kasbah-theme .analysis-card { background:var(--paper);border:4px double var(--kasbah-gold);border-radius:40px 40px 0 0; }
+.kasbah-theme .analysis-card h2 { color:var(--kasbah-wine); }
+.kasbah-theme .export-menu { border:1px solid var(--kasbah-gold);border-top:4px solid var(--kasbah-wine);border-radius:0; }
+.kasbah-theme .toast { border-radius:0;border-left:4px solid var(--kasbah-gold); }
+.kasbah-theme .empty-state { background:var(--paper);color:var(--ink); }
+.kasbah-theme .no-results { color:var(--kasbah-on); }
+.kasbah-theme .full-list .no-results { color:var(--muted); }
+
+@media(min-width:1600px){.kasbah-theme .page-content{padding-inline:36px}.kasbah-theme .topbar{padding-inline:36px}.kasbah-theme .kasbah-masthead,.kasbah-theme .workspace-bar{margin-inline:36px}}
+@media(max-width:1180px){.kasbah-theme .topbar h1{max-width:360px}.kasbah-theme .content-card>.card-header{flex-direction:row;align-items:center;flex-wrap:wrap}.kasbah-theme .workbench{gap:16px}}
+@media(max-width:900px){.kasbah-theme .topbar{padding:14px 20px!important}.kasbah-theme .kasbah-masthead{margin-inline:20px}.kasbah-theme .workspace-bar{margin-inline:20px;padding-inline:18px}.kasbah-theme .page-content{padding:0 20px 20px}.kasbah-theme .workbench{grid-template-columns:280px minmax(0,1fr);gap:14px}.kasbah-theme .kasbah-signature .brand{font-size:60px}.kasbah-theme .kasbah-masthead{min-height:140px}.kasbah-theme .drawer-header{padding-inline:20px}.kasbah-theme .drawer-scroll{padding-inline:20px}}
+@media(max-width:700px){
+  .kasbah-theme .topbar{padding:14px 16px 10px!important;gap:10px}
+  .kasbah-theme .heading-wrap{width:100%}.kasbah-theme .topbar h1{max-width:calc(100vw - 32px);font-size:13px}
+  .kasbah-theme .top-actions{gap:6px}.kasbah-theme .top-actions .button{font-size:11px;min-height:36px;padding:7px 9px}
+  .kasbah-theme .kasbah-masthead{margin:0 16px 6px;min-height:120px}
+  .kasbah-theme .kasbah-arcade{background-size:64px 83px;background-image:radial-gradient(ellipse 23px 43px at 50% 100%,var(--kasbah-wine) 96%,transparent 100%)}
+  .kasbah-theme .kasbah-signature{padding:12px 17px 18px;box-shadow:0 0 0 6px var(--kasbah-clay)}
+  .kasbah-theme .kasbah-signature .brand{font-size:49px;letter-spacing:-1.4px}
+  .kasbah-theme .kasbah-tagline{font-size:8px;letter-spacing:2.5px;margin-top:11px}
+  .kasbah-theme .workspace-bar{margin:0 16px 25px;padding:0 10px}
+  .kasbah-theme .workspace-bar .nav-list{gap:14px;justify-content:space-between}
+  .kasbah-theme .workspace-bar .nav-item{font-size:12px;padding:12px 0;gap:4px;min-height:44px}
+  .kasbah-theme .workspace-bar .nav-count{font-size:10px;min-width:0;padding:2px 5px}
+  .kasbah-theme .page-content{padding:0 16px 16px}
+  .kasbah-theme .content-card>.card-header{padding:15px 0;gap:12px}
+  .kasbah-theme .card-header h2{font-size:26px}
+  .kasbah-theme .card-actions .button{font-size:11px;min-height:36px;padding:7px 9px}
+  .kasbah-theme .classification-bar{padding:0 0 16px}
+  .kasbah-theme .classification-bar .category-strip{gap:6px}
+  .kasbah-theme .classification-bar .category-tab{font-size:12px;min-height:38px;padding:7px 9px;gap:6px}
+  .kasbah-theme .classification-bar .category-tab small{font-size:10px}
+  .kasbah-theme .workbench{grid-template-columns:1fr;gap:0}
+  .kasbah-theme .workbench-editor{border-radius:24px 24px 0 0;border-width:2px}
+  .kasbah-theme .drawer-header{padding-top:23px}
+  .kasbah-theme .drawer-header .eyebrow{padding-right:106px}
+  .kasbah-theme .pages-modal{padding:10px}
+  .kasbah-theme .pages-modal .pages-dialog{border-radius:26px 26px 0 0;border-width:2px;border-top-width:5px}
+  .kasbah-theme .pages-modal .pages-dialog>header{padding:24px 20px 18px}
+  .kasbah-theme .pages-modal .fm-tabs{padding-inline:20px;gap:22px}
+  .kasbah-theme .pages-modal .fm-file{padding-left:10px}
+}
+@media(prefers-reduced-motion:reduce){.kasbah-theme *{transition:none!important}}
+
+/* Golden mashrabiya: compact identity, fine lattice and uninterrupted reading. */
+.compact-shell .portrait-frame{position:relative;width:43px;height:43px;overflow:hidden;display:block;flex:none}
+.compact-shell .muhammad-portrait{position:absolute;width:56px;height:56px;max-width:none;left:-6px;top:-6px}
+.compact-shell .brand-wordmark{font:25px Georgia,serif;color:var(--kasbah-on)}
+body.compact-shell .topbar{flex-wrap:nowrap;gap:20px;min-height:60px}
+.compact-shell .heading-wrap{flex:0 0 auto;gap:0}
+.compact-shell .heading-wrap>div{display:none}
+.compact-shell .topbar .brand{gap:7px}
+.compact-shell .topbar .workspace-bar{flex:1;margin:0;padding:0;border:0;min-width:0;background:transparent}
+.compact-shell .workspace-bar::after,.compact-shell .workspace-progress{display:none}
+.compact-shell .workspace-bar .nav-list{gap:18px;justify-content:flex-start;max-width:none;flex-wrap:nowrap}
+.compact-shell .workspace-bar .nav-item{font-size:13px;white-space:nowrap;padding:8px 0}
+.compact-shell .top-actions{flex:none;gap:6px;width:auto}
+.compact-shell .top-actions .file-manager-button{display:none!important}
+.compact-shell .content-card>.card-header{display:none!important}
+.compact-shell .page-content{padding-top:8px}
+.compact-shell .workspace-tools{display:flex;flex-direction:row;align-items:center;padding:0 0 8px;gap:8px}
+.compact-shell .workspace-tools .search-box{flex:1;min-width:120px;width:auto;background:#ffffff0a;color:var(--kasbah-on);border-color:#c9a55e88;height:38px}
+.compact-shell .workspace-tools .search-box input{color:var(--kasbah-on)}
+.compact-shell .workspace-tools .search-box input::placeholder{color:#d6cba9}
+.compact-shell .workspace-tools .filter-group{display:flex;flex:none}
+.compact-shell .workspace-tools .filter-toggle{color:var(--kasbah-on);border-color:#c9a55e88}
+.compact-shell .workspace-tools .card-actions{display:flex;flex-wrap:nowrap;gap:6px}
+.compact-shell .workspace-tools .button{min-height:38px;font-size:12px;padding:7px 10px}
+.compact-shell .classification-bar{padding:0 0 8px}
+.compact-shell .classification-bar .category-strip{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding:0 0 5px;gap:6px}
+.compact-shell .classification-bar .category-tab{flex:none;min-height:34px;padding:5px 9px;font-size:12px}
+.compact-shell .workbench{height:max(420px,calc(100dvh - var(--workbench-offset,170px) - 18px))}
+.compact-shell .requirement-list-panel>.sort-wrap{padding:10px 14px;display:block}
+.compact-shell .filter-popover{background:var(--paper);padding:16px;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:10px}
+.compact-shell .filter-popover[hidden]{display:none}
+.compact-shell .filter-popover #idHierarchyFilter{grid-column:1/-1;color:var(--ink);padding:10px 0 0}
+.compact-shell .workspace-more{position:relative;color:var(--kasbah-on)}
+.compact-shell .workspace-more>summary{list-style:none;cursor:pointer;border:1px solid #c9a55e88;min-height:38px;padding:8px 10px;font-size:12px}
+.compact-shell .workspace-more-body{position:absolute;right:0;top:calc(100% + 5px);z-index:30;display:grid;gap:6px;background:var(--kasbah-wine);padding:12px;border:1px solid var(--kasbah-gold);min-width:180px}
+.compact-shell .project-context[hidden]{display:none!important}
+.compact-shell .pages-body .project-context>summary{display:none}
+.compact-shell .workspace-more .export-menu{right:0;left:auto;top:100%;min-width:180px}
+@media(max-width:1000px){body.compact-shell .topbar{gap:10px;flex-wrap:wrap}.compact-shell .workspace-bar .nav-list{gap:12px}.compact-shell .brand-wordmark{font-size:21px}.compact-shell .workspace-tools{flex-wrap:wrap}.compact-shell .workspace-tools .card-actions{margin-left:auto}}
+@media(max-width:700px){.compact-shell .topbar .workspace-bar{order:3;flex-basis:100%}.compact-shell .heading-wrap{width:auto;flex:1}.compact-shell .top-actions .button{padding:6px;font-size:11px}.compact-shell .workspace-tools .search-box{flex-basis:65%}.compact-shell .filter-popover{grid-template-columns:1fr 1fr}.compact-shell .workspace-tools .card-actions{width:100%;justify-content:flex-end}.compact-shell .workbench{height:680px}}
+body.editorial-app.kasbah-theme{background-image:linear-gradient(45deg,transparent 48%,#c9a55e0a 49% 51%,transparent 52%),linear-gradient(-45deg,transparent 48%,#c9a55e0a 49% 51%,transparent 52%);background-size:48px 48px}
+.editorial-app.kasbah-theme .topbar{min-height:64px;padding:10px 24px!important;gap:12px;border-bottom:1px solid #c9a55e55}
+.kasbah-theme .heading-wrap{gap:20px;flex:1}
+.kasbah-theme .heading-wrap>.brand{flex:0 0 auto}
+.kasbah-theme .muhammad-logo{display:block;width:208px;height:44px;max-width:none}
+.kasbah-theme .topbar .breadcrumb{display:none}
+.kasbah-theme .topbar h1{font-size:13px;max-width:240px}
+.kasbah-theme .workspace-bar{margin:0 24px 12px;border-top:0;border-bottom:1px solid var(--kasbah-gold);padding:0 12px}
+.kasbah-theme .workspace-bar .nav-item{padding-block:10px}
+.kasbah-theme .workspace-bar::after{height:5px;top:calc(100% + 3px);background:repeating-linear-gradient(45deg,transparent 0 7px,var(--kasbah-gold) 7px 8px,transparent 8px 14px);opacity:.7}
+.kasbah-theme .content-card>.card-header{padding:12px 0}
+.kasbah-theme .classification-bar{padding-bottom:12px}
+.kasbah-theme .requirement-list-panel{--ink:#f7e8c2;--muted:#d6cba9;--line:#496251;--line-strong:#a28e58;--paper:#082f2a;--canvas:#082f2a;--teal:#f7e8c2;--teal-soft:#255c49}
+.kasbah-theme .requirement-record.is-current,.kasbah-theme .full-list .requirement-list-panel{--ink:#213b32;--muted:#626b5b;--line:#d8cba9;--line-strong:#b9a779;--paper:#fbf5e5;--canvas:#eee8d5;--teal:#145344;--teal-soft:#e8ecdd}
+.kasbah-theme .requirement-list-panel .filter-popover select{color:#213b32;background:#fffaf0}
+.kasbah-theme .requirement-list-panel .bulk-bar{--teal:#145344;--paper:#fbf5e5;color:#213b32;background:#e8ecdd}
+.kasbah-theme .workbench-editor{border-radius:0;border:1px solid var(--kasbah-gold);border-top:4px double var(--kasbah-gold)}
+.kasbah-theme .drawer-header{padding-top:18px}
+.kasbah-theme .pages-modal{background:#041e1b99}
+.kasbah-theme .pages-modal .pages-dialog{border:1px solid var(--kasbah-gold);border-top:5px double var(--kasbah-gold);border-radius:3px}
+.kasbah-theme .description-section{margin:4px 0 24px;min-width:0}
+.kasbah-theme .description-section h3{font-size:13px;color:var(--muted);font-weight:600;margin:0 0 14px}
+.kasbah-theme .description-reader{font-size:17px;line-height:1.9;overflow:visible;max-height:none;white-space:normal;overflow-wrap:anywhere;word-break:normal;user-select:text}
+.kasbah-theme .description-reader p{margin:0 0 .75em;max-width:none}
+.kasbah-theme .description-section [hidden]{display:none!important}
+.kasbah-theme #formDescription{min-height:180px;resize:none;overflow:hidden}
+.kasbah-theme .drawer-scroll{scrollbar-gutter:stable;overscroll-behavior:auto}
+@media(max-width:700px){
+ .editorial-app.kasbah-theme .topbar{padding:8px 16px!important;gap:8px}
+ .kasbah-theme .heading-wrap{gap:12px}
+ .kasbah-theme .muhammad-logo{width:172px;height:37px}
+ .kasbah-theme .topbar h1{max-width:calc(100vw - 230px);font-size:12px}
+ .kasbah-theme .workspace-bar{margin-inline:16px}
+ .kasbah-theme .description-reader{font-size:16px}
+ .kasbah-theme .workbench-editor{border-radius:0}
+}
+
+.editorial-app.compact-shell .heading-wrap{flex:0 0 auto;gap:0;width:auto}
+.editorial-app.compact-shell .workspace-bar .nav-list{width:auto}
+.editorial-app.compact-shell .workspace-tools{flex-wrap:nowrap}
+.editorial-app.compact-shell .workspace-tools .filter-group{width:auto;margin-left:0;overflow:visible}
+.editorial-app.compact-shell .workspace-tools .filter-toggle{background:transparent;color:var(--kasbah-on);border:1px solid var(--kasbah-gold)}
+.editorial-app.compact-shell .requirement-list-panel>.sort-wrap{flex:0 0 auto}
+@media(max-width:700px){.editorial-app.compact-shell .heading-wrap{flex:1}.editorial-app.compact-shell .top-actions{width:auto}.editorial-app.compact-shell .workspace-bar .nav-list{width:100%}}
+@media(max-width:700px){.editorial-app.compact-shell .workspace-tools{flex-wrap:wrap}.editorial-app.compact-shell .workspace-tools .search-box{flex:1 1 65%}}

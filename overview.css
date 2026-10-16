@@ -1,0 +1,41 @@
+.overview-dialog>header{position:sticky;top:0;z-index:2;background:#fff}
+.overview-dialog .overview-steps{list-style:none;padding:0;margin:0 0 24px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.overview-steps li{display:flex;align-items:center;gap:10px;padding:14px 12px;background:#f3f5f5;border:1px solid #e2e8e6;border-radius:12px;color:#687974}
+.overview-steps li.is-current{background:#e8f7f2;border:2px solid #0f8275;color:#075d52}
+.overview-steps li.is-done{background:#f0f8f4;color:#277350}
+.overview-step-number{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:50%;background:#e0e7e4;font-weight:800}
+.is-current .overview-step-number{background:#0f8275;color:#fff}
+.is-done .overview-step-number{background:#d6eddf;color:#237048}
+.overview-steps strong{display:block;font-size:17px}.overview-steps small{display:block;margin-top:3px;font-size:13px}
+.overview-document-row{display:flex;gap:12px;align-items:flex-end}.overview-document-row .pages-field{flex:1;min-width:0;margin:0}
+.overview-document-row>.pages-action{margin-bottom:1px;flex-shrink:0}
+.overview-document-tools{display:flex;gap:8px;flex-shrink:0}
+.overview-file-caption{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.overview-file-caption .overview-ai-badge{padding:3px 10px;font-size:13px;font-weight:600}
+.overview-ai-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:15px 0}
+.overview-ai-badge{padding:6px 12px;border-radius:20px;font-size:15px;background:#fff2d9;color:#875609}
+.overview-ai-badge.connected{background:#e8f5ec;color:#216744}
+.overview-flow-card{background:#f5faf8;border:1px solid #cfe4da;border-radius:16px;padding:22px;margin:18px 0 30px}
+.overview-flow-card[data-state="error"],.overview-flow-card[data-state="paused"],.overview-flow-card[data-state="preparePaused"]{background:#fff8ed;border-color:#eccd91}
+.overview-eyebrow{font-weight:800;font-size:14px;color:#0f7669;letter-spacing:.04em}
+.overview-dialog .overview-flow-card h3{font-size:24px;margin:8px 0}
+.overview-dialog .overview-flow-card p{margin:10px 0;color:#465d55}
+.overview-progress-heading{display:flex;justify-content:space-between;gap:16px;margin-top:22px;font-size:16px}
+.overview-flow-card progress{display:block;width:100%;height:14px;margin-top:10px;border:0;border-radius:8px;overflow:hidden;accent-color:#0f8275}
+.overview-flow-card progress::-webkit-progress-bar{background:#dfebe5;border-radius:8px}
+.overview-flow-card progress::-webkit-progress-value{background:#0f8275;border-radius:8px;transition:width .25s}
+.overview-dialog .overview-progress-detail,.overview-dialog .overview-volume{font-size:15px}
+.overview-dialog .overview-flow-card .overview-controls{margin:20px 0 8px}
+.overview-flow-card .pages-action.primary{padding:12px 22px;min-width:170px}
+.overview-dialog [data-overview-status]:empty{display:none}
+.overview-dialog .overview-flow-card [data-overview-status]{padding-top:12px;border-top:1px solid #d9e7df;font-size:15px}
+.overview-filter-panel{padding:16px;margin:18px 0;background:#f5faf8;border:1px solid #d7e7df;border-radius:12px}
+.overview-filter-panel[hidden]{display:none}
+.overview-filter-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.overview-filter-row .pages-field{margin:0;flex:1;min-width:220px}
+.overview-filter-row .pages-action{min-height:46px}
+.overview-dialog [data-overview-filter-count]{margin:10px 0 0;font-size:15px;color:#526b60}
+.overview-results-heading{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;border-bottom:1px solid #e0e8e4}
+.overview-dialog .overview-results-heading h3{font-size:21px;margin:0 0 12px}
+.overview-dialog .overview-results-heading p{font-size:14px;margin:0 0 12px;color:#667970}
+@media(max-width:640px){.overview-dialog .overview-steps{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.overview-steps li{padding:10px 8px}.overview-steps strong{font-size:15px}.overview-document-row{align-items:stretch;flex-direction:column}.overview-flow-card{padding:16px}.overview-dialog .overview-flow-card h3{font-size:21px}.overview-ai-row .pages-action{font-size:14px}.overview-flow-card .pages-action.primary{width:100%}}

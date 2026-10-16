@@ -1,0 +1,48 @@
+/* Project document cabinet: clear sections, restrained surfaces, explicit actions. */
+.fm-modal .fm-dialog{width:min(1120px,100%);max-height:92vh;background:#fff;border-radius:14px}
+.fm-modal .fm-dialog>header{padding:26px 30px 22px;align-items:flex-start}
+.fm-modal .fm-dialog h2{font-size:25px;letter-spacing:-.035em;margin:4px 0 12px}
+.fm-modal .fm-eyebrow{font-size:13px;font-weight:700;color:#66736e;letter-spacing:.04em;margin:0}
+.fm-project{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:15px;color:#52615c}
+.fm-project [data-project-name]{font-weight:650;color:#273b33;overflow-wrap:anywhere}
+.fm-project [data-project-role]{border-left:1px solid #d4ded9;padding-left:12px;color:#748179;font-size:13px}
+.fm-tabs{display:flex;gap:26px;padding:0 30px;border-bottom:1px solid #dce3df}
+.fm-tabs [role=tab]{appearance:none;border:0;border-bottom:3px solid transparent;background:transparent;padding:17px 2px 14px;font:inherit;font-size:17px;font-weight:650;color:#7b8781;cursor:pointer}
+.fm-tabs [aria-selected=true]{color:#183d30;border-bottom-color:#234f3f}
+.fm-modal .pages-body{padding:0 30px 28px}
+.fm-modal [hidden]{display:none!important}
+.fm-notice:empty{display:none}
+.fm-modal .fm-notice{margin:18px 0 0;padding:12px 16px;background:#eff6f2;border-left:3px solid #45795b;line-height:1.6;font-size:16px;overflow-wrap:anywhere}
+.fm-modal .fm-notice[data-error=true]{background:#fff4f1;border-color:#b65742;color:#8f3629}
+.fm-section{padding:26px 0 8px}
+.fm-section+.fm-section{border-top:1px solid #dce3df;margin-top:22px}
+.fm-section-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}
+.fm-modal h3{font-size:20px;margin:0 0 6px;letter-spacing:-.02em;color:#243b30}
+.fm-section-heading h3 span{font-size:14px;font-weight:500;color:#77847d;margin-left:8px}
+.fm-modal .fm-section-heading p,.fm-modal .fm-setting p{font-size:16px;color:#6a7870;line-height:1.7;margin:0}
+.fm-help{padding:14px 18px;border:1px solid #e3e8e5;background:#f8faf9;margin-bottom:6px}
+.fm-modal .fm-help p{font-size:15px;line-height:1.7;color:#67756d;margin:4px 0}
+.fm-help strong{color:#354c40;margin-right:9px;font-weight:650}
+.fm-file{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:22px;padding:22px 0;border-bottom:1px solid #e7ece9}
+.fm-file-info{min-width:0}
+.fm-file h4{display:inline;font-size:17px;line-height:1.6;font-weight:650;color:#263c30;overflow-wrap:anywhere}
+.fm-selected{display:inline-block;margin:0 0 0 10px;padding:2px 7px;background:#e9f2ec;border:1px solid #cee0d4;color:#3c624b;font-size:12px;font-weight:650;border-radius:4px;vertical-align:2px;white-space:nowrap}
+.fm-modal .fm-file-meta{font-size:13px;color:#7c8780;margin:7px 0 0;line-height:1.6}
+.fm-file-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.fm-action{appearance:none;border:1px solid #d2dbd5;background:#fff;border-radius:6px;padding:10px 13px;min-height:42px;color:#41584a;font:inherit;font-size:14px;font-weight:600;line-height:1.4;cursor:pointer;white-space:nowrap}
+.fm-action:hover:not(:disabled){border-color:#839c8b;background:#f5f8f6}
+.fm-action-primary{background:#244f3a;border-color:#244f3a;color:#fff}
+.fm-action-primary:hover:not(:disabled){background:#183d2a;color:#fff}
+.fm-action-danger{color:#986557;border-color:transparent}
+.fm-action-danger:hover:not(:disabled){background:#fff5f1;border-color:#e7ccc2}
+.fm-action:disabled{opacity:.4;cursor:default}
+.fm-action:focus-visible,.fm-tabs button:focus-visible{outline:3px solid #8cae9a;outline-offset:3px}
+.fm-file-protection{grid-column:1/-1;margin-top:10px;font-size:12px;color:#88928c}
+.fm-empty{padding:30px 20px;border:1px dashed #d8e0db;text-align:center;color:#7c8980;font-size:16px}
+.fm-setting{padding:26px 0;border-bottom:1px solid #e1e7e3}
+.fm-setting h3{margin-bottom:10px}
+.fm-setting .fm-action{margin-top:18px}
+.fm-modal .fm-setting .fm-setting-note{margin-top:12px;font-size:14px;color:#8a948e}
+.fm-modal[aria-busy=true] .fm-tabs{pointer-events:none}
+@media(max-width:1000px){.fm-file{grid-template-columns:1fr}.fm-file-actions{justify-content:flex-start;margin-top:14px}}
+@media(max-width:600px){.fm-modal{padding:10px}.fm-modal .fm-dialog>header{padding:20px}.fm-tabs{padding:0 20px;gap:20px}.fm-modal .pages-body{padding:0 20px 22px}.fm-modal .fm-dialog h2{font-size:22px}.fm-section-heading{align-items:flex-start;flex-direction:column;gap:12px}.fm-file-actions{gap:8px}.fm-action{font-size:14px;min-height:44px;padding:10px}.fm-help{padding:12px}.fm-selected{margin-left:6px}}
