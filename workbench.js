@@ -167,14 +167,28 @@
       if(previous)previous.setAttribute('aria-hidden','true');modal.removeAttribute('aria-hidden');
     }else if(activeDialog){activeDialog=null;document.body.classList.remove('dialog-open');document.body.style.overflow='';if(returnFocus?.isConnected)returnFocus.focus({preventScroll:true});returnFocus=null;}
   }
-  function dialog({title,copy,fields=[],confirm='확인',danger=false}){
+  function dialog({title,copy,fields=[],confirm='확인',danger=false,save}){
     return new Promise(resolve=>{
       const modal=element('div','pages-modal open ui-prompt');const shell=element('section','pages-dialog');shell.setAttribute('role','dialog');shell.setAttribute('aria-modal','true');shell.setAttribute('aria-label',title);
       const header=element('header'),heading=element('h2','',title),close=button('×','pages-close');close.setAttribute('aria-label','닫기');header.append(heading,close);
       const form=element('form','pages-body');if(copy)form.append(element('p','ui-confirm-copy',copy));
       const inputs=fields.map(field=>{const label=element('label','pages-field');label.append(element('span','',field.label));const input=element('input');input.value=field.value||'';input.required=field.required!==false;input.maxLength=field.maxLength||120;label.append(input);form.append(label);return input;});
-      const actions=element('div','ui-dialog-actions'),cancel=button('취소','pages-action'),done=button(confirm,'pages-action primary');done.type='submit';if(danger)done.style.background='var(--danger)';actions.append(cancel,done);form.append(actions);shell.append(header,form);modal.append(shell);document.body.append(modal);
-      const finish=result=>{modal.remove();resolve(result);};cancel.onclick=close.onclick=()=>finish(null);modal.onclick=event=>{if(event.target===modal)finish(null);};form.onsubmit=event=>{event.preventDefault();if(form.reportValidity())finish(inputs.length?inputs.map(input=>input.value):true);};
+      const feedback=element('p','ui-save-feedback');feedback.setAttribute('role','status');feedback.hidden=true;
+      const actions=element('div','ui-dialog-actions'),cancel=button('취소','pages-action'),done=button(confirm,save?'pages-action':'pages-action primary');done.type='submit';if(danger)done.style.background='var(--danger)';actions.append(cancel,done);form.append(feedback,actions);shell.append(header,form);modal.append(shell);document.body.append(modal);
+      let busy=false;
+      const finish=result=>{if(busy)return;modal.remove();resolve(result);};cancel.onclick=close.onclick=()=>finish(null);modal.onclick=event=>{if(event.target===modal)finish(null);};form.onsubmit=event=>{event.preventDefault();if(form.reportValidity())finish(inputs.length?inputs.map(input=>input.value):true);};
+      if(save){
+        const saveButton=button('저장하고 이동','pages-action primary');actions.append(saveButton);
+        saveButton.onclick=async()=>{
+          if(busy)return;busy=true;modal.setAttribute('aria-busy','true');feedback.hidden=false;feedback.textContent='저장 중입니다. 완료되면 이동합니다.';
+          [cancel,done,close,saveButton].forEach(control=>control.disabled=true);saveButton.textContent='저장 중…';
+          let saved=false;
+          try{saved=await save()===true;}catch(error){feedback.textContent=error.message||'저장하지 못했습니다.';}
+          finally{busy=false;modal.setAttribute('aria-busy','false');[cancel,done,close,saveButton].forEach(control=>control.disabled=false);saveButton.textContent='저장하고 이동';}
+          if(saved)finish(true);
+          else feedback.textContent='저장하지 못해 이동하지 않았습니다. 오류 안내를 확인하거나 ‘취소’를 눌러 입력 내용을 확인해 주세요.';
+        };
+      }
     });
   }
   // A single keyboard policy for all dialogs; the editor remains behind the active dialog.
@@ -190,6 +204,8 @@
     }
   },true);
   window.addEventListener('beforeunload',event=>{if(window.ReqlyApp?.isEditorDirty()){event.preventDefault();event.returnValue='';}});
-  window.ReqlyDesign={sync,markDirty,confirm:async(title,copy)=>!!(await dialog({title,copy,confirm:title.includes('삭제')?'삭제':title.includes('작성 중')?'저장하지 않고 이동':'계속',danger:true})),prompt:async(title,label,value='')=>{const result=await dialog({title,fields:[{label,value}],confirm:'만들기'});return result?result[0]:null;},notice:async(title,copy)=>dialog({title,copy,confirm:'확인'})};
+  window.ReqlyDesign={sync,markDirty,
+    unsavedChanges:async save=>!!(await dialog({title:'작성 중인 내용이 있습니다',copy:'변경사항을 저장하고 이동하시겠습니까?',confirm:'저장하지 않고 이동',save})),
+    confirm:async(title,copy)=>!!(await dialog({title,copy,confirm:title.includes('삭제')?'삭제':title.includes('작성 중')?'저장하지 않고 이동':'계속',danger:true})),prompt:async(title,label,value='')=>{const result=await dialog({title,fields:[{label,value}],confirm:'만들기'});return result?result[0]:null;},notice:async(title,copy)=>dialog({title,copy,confirm:'확인'})};
   document.addEventListener('DOMContentLoaded',buildLayout);
 })();

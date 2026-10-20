@@ -1,7 +1,7 @@
 /* Originals are kept separately from requirement edits and JSON backups. */
 (() => {
   'use strict';
-  let database, modal, settingsModal, settingsPanel, currentId='', working=false;
+  let database, modal, settingsModal, settingsPanel, currentId='', working=false, switching=false;
   const shared=()=>!!window.ReqlyShared?.enabled;
   function db(){return database||=(new Promise((resolve,reject)=>{const r=indexedDB.open('reqly-original-files',1);r.onupgradeneeded=()=>r.result.createObjectStore('files',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);}));}
   async function operation(mode,fn){const d=await db();return new Promise((resolve,reject)=>{const tx=d.transaction('files',mode),r=fn(tx.objectStore('files'));r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
@@ -38,6 +38,30 @@
     return '';
   }
   function settingsNotice(text){settingsModal.querySelector('[data-settings-message]').textContent=text;}
+  async function navigateProject(url){
+    if(switching)return;switching=true;
+    try{
+      if(window.ReqlyApp?.confirmLeave&&!(await window.ReqlyApp.confirmLeave()))return;
+      window.ReqlyApp?.allowNavigation?.();
+      location.href=url;
+    }finally{switching=false;}
+  }
+  function renderProjectList(){
+    const section=settingsPanel.querySelector('[data-known-projects]');
+    section.hidden=!window.ReqlyShared?.available;
+    const area=section.querySelector('[data-shared-project-list]');area.replaceChildren();
+    const projects=window.ReqlyShared?.knownProjects?.()||[];
+    if(!projects.length)area.append(node('p','아직 기록된 공유 프로젝트가 없습니다. 아래에 기존 공유 링크를 붙여 넣어 열 수 있습니다.','fm-empty'));
+    for(const project of projects){
+      const row=node('article',undefined,'shared-project-row'),info=node('div'),name=node('h4',project.name);
+      const current=shared()&&project.id===window.ReqlyShared.project.id;
+      const date=new Date(project.updatedAt),stamp=Number.isNaN(date.getTime())?'마지막 저장일 확인 전':`마지막 확인한 저장: ${date.toLocaleString('ko-KR')}`;
+      info.append(name,node('p',stamp));row.append(info);
+      const open=node('button',current?'현재 프로젝트':'열기',`fm-action${current?'':' fm-action-primary'}`);open.type='button';open.disabled=current;
+      open.onclick=()=>navigateProject(window.ReqlyProjectDirectory.projectUrl(location.href,project.id));
+      row.append(open);area.append(row);
+    }
+  }
   function renderSettings(){
     const role=shared()?window.ReqlyShared.role:'';
     settingsPanel.querySelector('[data-share]').hidden=!shared();settingsPanel.querySelector('[data-new]').hidden=!window.ReqlyShared?.available;
@@ -48,6 +72,7 @@
     settingsPanel.querySelector('[data-share-intro]').textContent=shared()?'아래 링크와 사용자용 비밀번호를 전달하면 함께 조회·편집할 수 있습니다.':'현재는 브라우저 프로젝트입니다. 다른 사람과 함께 작업하려면 새 공유 프로젝트를 만들어 주세요.';
     const url=settingsPanel.querySelector('[data-project-url]');url.closest('label').hidden=!shared();url.value=shared()?window.ReqlyShared.shareUrl():'';
     const title=settingsModal.querySelector('h2');if(shared())title.textContent=window.ReqlyShared.project.name;
+    renderProjectList();
   }
   async function run(button,fn){
     if(working)return;working=true;notice('처리 중입니다…');modal.setAttribute('aria-busy','true');
@@ -96,6 +121,7 @@
         <section class="fm-section"><div class="fm-section-heading"><div><h3>관련자료 <span data-count="reference"></span></h3><p>회의록·녹취록·참고자료를 한곳에서 관리합니다.</p></div><button type="button" class="fm-action" data-reference>+ 관련자료 추가</button></div><div data-files="reference"></div></section>
       </div>
       <div role="tabpanel" id="fm-settings" aria-labelledby="fm-settings-tab" data-file-panel="settings" hidden>
+        <section class="fm-setting" data-known-projects><h3>프로젝트 목록</h3><p>이 브라우저에서 만들거나 접속한 공유 프로젝트입니다. 다른 프로젝트를 열 때는 해당 비밀번호를 입력합니다.</p><div data-shared-project-list></div><form data-open-shared-form class="shared-project-link"><label class="pages-field"><span>기존 프로젝트 공유 링크</span><input type="url" data-open-shared-url required placeholder="https://…?project=…" aria-label="기존 프로젝트 공유 링크"></label><button type="submit" class="fm-action">링크로 열기</button></form></section>
         <section class="fm-setting"><h3>프로젝트 공유</h3><p data-share-intro></p><label class="pages-field"><span>공유 링크</span><input readonly data-project-url aria-label="프로젝트 공유 링크"></label><button type="button" class="fm-action fm-action-primary" data-share>공유 URL 복사</button><p class="fm-setting-note">관리자용 비밀번호는 프로젝트를 관리하는 사람만 사용해 주세요.</p></section>
         <section class="fm-setting"><h3>비밀번호 변경</h3><p data-password-note></p><button type="button" class="fm-action" data-password>비밀번호 변경</button></section>
         <section class="fm-setting"><h3>다른 프로젝트 시작</h3><p>현재 프로젝트와 별개의 새 공유 프로젝트를 만듭니다.</p><button type="button" class="fm-action" data-new>새 공유 프로젝트</button></section>
@@ -104,7 +130,7 @@
     // Sharing/passwords belong exclusively to Project; the cabinet keeps documents only.
     settingsPanel=modal.querySelector('#fm-settings');settingsPanel.hidden=false;settingsPanel.removeAttribute('role');settingsPanel.removeAttribute('aria-labelledby');settingsPanel.removeAttribute('data-file-panel');
     settingsModal=document.getElementById('projectModal');
-    if(!settingsModal){settingsModal=node('div',undefined,'pages-modal fm-modal');settingsModal.id='projectSettingsModal';settingsModal.innerHTML='<section class="pages-dialog" role="dialog" aria-modal="true" aria-label="프로젝트 설정"><header><div><h2>프로젝트</h2><p>공유 · 비밀번호 · 새 프로젝트</p></div><button class="pages-close" type="button" aria-label="프로젝트 설정 닫기">×</button></header><div class="pages-body"></div></section>';document.body.append(settingsModal);settingsModal.onclick=event=>{if(event.target===settingsModal||event.target.closest('.pages-close'))settingsModal.classList.remove('open');};}
+    if(!settingsModal){settingsModal=node('div',undefined,'pages-modal fm-modal');settingsModal.id='projectSettingsModal';settingsModal.innerHTML='<section class="pages-dialog" role="dialog" aria-modal="true" aria-label="프로젝트 설정"><header><div><h2>프로젝트</h2><p>프로젝트 목록 · 공유 · 비밀번호</p></div><button class="pages-close" type="button" aria-label="프로젝트 설정 닫기">×</button></header><div class="pages-body"></div></section>';document.body.append(settingsModal);settingsModal.onclick=event=>{if(event.target===settingsModal||event.target.closest('.pages-close'))settingsModal.classList.remove('open');};}
     const settingsMessage=node('p',undefined,'fm-notice');settingsMessage.dataset.settingsMessage='';settingsMessage.setAttribute('role','status');settingsModal.querySelector('.pages-body').prepend(settingsMessage,settingsPanel);
     modal.querySelector('.fm-tabs').remove();const documentsPanel=modal.querySelector('#fm-documents');documentsPanel.removeAttribute('role');documentsPanel.removeAttribute('aria-labelledby');
     modal.onclick=event=>{if(!working&&(event.target===modal||event.target.closest('.pages-close')))modal.classList.remove('open');};
@@ -122,7 +148,12 @@
     let kind='rfp';const input=modal.querySelector('[data-input]');for(const type of ['rfp','reference'])modal.querySelector(`[data-${type}]`).onclick=()=>{if(working)return;kind=type;input.click();};
     input.onchange=async()=>{await run(modal.querySelector(`[data-${kind}]`),async()=>{const files=Array.from(input.files);for(const file of files)await add(file,kind);if(kind==='reference')await window.ReqlyApp.addReferences(files);notice(kind==='rfp'?'RFP를 추가했습니다. 아래에서 기본 지정 또는 요구사항 추출을 선택해 주세요.':'관련자료를 추가했습니다.');});input.value='';};
     settingsPanel.querySelector('[data-share]').onclick=()=>navigator.clipboard.writeText(window.ReqlyShared.shareUrl()).then(()=>settingsNotice('공유 URL을 복사했습니다. 사용자용 비밀번호를 함께 전달해 주세요.')).catch(()=>settingsNotice(window.ReqlyShared.shareUrl()));
-    settingsPanel.querySelector('[data-new]').onclick=()=>{const url=new URL(location.href);url.searchParams.delete('project');url.searchParams.set('mode','shared');location.href=url.href;};
+    settingsPanel.querySelector('[data-new]').onclick=()=>{const url=new URL(location.href);url.searchParams.delete('project');url.searchParams.set('mode','shared');navigateProject(url.href);};
+    settingsPanel.querySelector('[data-open-shared-form]').onsubmit=event=>{
+      event.preventDefault();
+      try{const id=window.ReqlyProjectDirectory.idFromUrl(settingsPanel.querySelector('[data-open-shared-url]').value);navigateProject(window.ReqlyProjectDirectory.projectUrl(location.href,id));}
+      catch(error){settingsNotice(error.message);}
+    };
     settingsPanel.querySelector('[data-password]').onclick=async()=>{
       if(working||!shared()||window.ReqlyShared.role!=='admin')return;
       const entry=await window.ReqlyShared.fields('비밀번호 변경',[{label:'변경 대상',options:[['user','사용자용'],['admin','관리자용']]},{label:'현재 관리자용 비밀번호',password:true},{label:'새 비밀번호',password:true,autocomplete:'new-password'},{label:'새 비밀번호 확인',password:true,autocomplete:'new-password',mustMatch:2}]);if(!entry)return;

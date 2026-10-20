@@ -50,9 +50,11 @@
   async function dbPut(value) {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
-      const request = db.transaction(STORE, 'readwrite').objectStore(STORE).put(value);
-      request.onsuccess = () => resolve(value);
-      request.onerror = () => reject(request.error);
+      const transaction = db.transaction(STORE, 'readwrite');
+      transaction.objectStore(STORE).put(value);
+      transaction.oncomplete = () => resolve(value);
+      transaction.onerror = () => reject(transaction.error || new Error('프로젝트를 저장하지 못했습니다.'));
+      transaction.onabort = () => reject(transaction.error || new Error('프로젝트 저장이 취소되었습니다.'));
     });
   }
 
@@ -143,7 +145,10 @@
       const openButton = event.target.closest('[data-open-project]');
       const exportButton = event.target.closest('[data-export-project]');
       const deleteButton = event.target.closest('[data-delete-project]');
-      if (openButton) { localStorage.setItem(ACTIVE_KEY, openButton.dataset.openProject); location.reload(); }
+      if (openButton) {
+        if(window.ReqlyApp?.confirmLeave&&!(await window.ReqlyApp.confirmLeave()))return;
+        localStorage.setItem(ACTIVE_KEY, openButton.dataset.openProject);window.ReqlyApp?.allowNavigation?.();location.reload();
+      }
       if (exportButton) {
         const project = await dbGet(exportButton.dataset.exportProject);
         download(`${project.name.replace(/[\\/:*?"<>|]/g,'_')}_Muhammad백업.json`, new Blob([JSON.stringify({format:'reqly-pages-project',version:1,project}, null, 2)], {type:'application/json'}));
@@ -161,9 +166,10 @@
         await renderProjects(modal);
       }
       if (event.target.closest('[data-new-project]')) {
+        if(window.ReqlyApp?.confirmLeave&&!(await window.ReqlyApp.confirmLeave()))return;
         const name = await(window.ReqlyDesign?.prompt('새 프로젝트','프로젝트 이름','새 RFP 프로젝트')??prompt('새 프로젝트 이름을 입력하세요.', '새 RFP 프로젝트'));
         if (name === null) return;
-        const project = await newProject(name); localStorage.setItem(ACTIVE_KEY, project.id); location.reload();
+        const project = await newProject(name); localStorage.setItem(ACTIVE_KEY, project.id);window.ReqlyApp?.allowNavigation?.();location.reload();
       }
       if (event.target.closest('[data-import-project]')) modal.querySelector('[data-import-input]').click();
     });

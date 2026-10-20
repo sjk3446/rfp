@@ -5,10 +5,13 @@
   const parameters = new URLSearchParams(location.search);
   const useShared = !!endpoint && parameters.get('mode') !== 'local' && (parameters.has('project') || parameters.get('mode') === 'shared' || location.hostname.endsWith('.github.io'));
   let project, token='', role='', peer, peerOrigin, ready, timer, busy=false;
+  let saveQueue=Promise.resolve();
   const pending = new Map();
   const hex = bytes => [...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
   const nonce = hex(crypto.getRandomValues(new Uint8Array(32)));
   const core = window.ReqlySharedCore;
+  let directoryStorage;try{directoryStorage=window.localStorage;}catch(_){}
+  const directory=window.ReqlyProjectDirectory?.create(directoryStorage);
   const clone = value => JSON.parse(JSON.stringify(value));
   function fields(title, labels){
     return new Promise(resolve=>{
@@ -90,7 +93,10 @@
   }
   function accept(result) {
     if(result.token)token=result.token;if(result.role)role=result.role;
+    // A load started before a save can finish after it. Never roll back revisions.
+    if(result.project&&project?.id===result.project.id&&result.project.version<project.version)return project;
     if(result.project)project=clone(result.project);
+    if(result.project)directory?.remember(project,!!result.token);
     window.dispatchEvent(new CustomEvent('reqly-shared-update',{detail:{project:clone(project),role}}));
     return project;
   }
@@ -124,9 +130,36 @@
       accept(result);const url=new URL(location.href);url.searchParams.set('project',project.id);history.replaceState(null,'',url);return project;
     },
     async saveItems(items,metadata){
-      if(busy)throw new Error('저장 중입니다. 잠시 기다려 주세요.');busy=true;
-      try{const changes=core.changesBetween(project.workspace.requirements,items);if(!changes.length&&!metadata)return project;
-        return accept(await rpc('save',{changes,metadata,expectedVersion:project.version}));}finally{busy=false;}
+      const original=clone(project),drafts=clone(items),meta=metadata?clone(metadata):undefined;
+      const operation=saveQueue.then(async()=>{
+        busy=true;
+        try{
+          if(project.id!==original.id)throw new Error('프로젝트가 변경되어 저장하지 않았습니다.');
+          for(let attempt=0;attempt<2;attempt++){
+            const rebased=drafts.map(draft=>{
+              const base=original.workspace.requirements.find(item=>item.key===draft.key);
+              // Unknown stale callers must not be granted the current revision.
+              if(base&&(draft.revision||0)!==(base.revision||0))throw core.conflictError();
+              const latest=project.workspace.requirements.find(item=>item.key===draft.key);
+              const result=core.mergeEdits(base,draft,latest);
+              if(result.conflicts.length)throw core.conflictError(result.conflicts);
+              return result.item;
+            });
+            if(meta&&['document','references'].some(field=>core.canonical(original.workspace[field])!==core.canonical(project.workspace[field])))
+              throw core.conflictError();
+            const changes=core.changesBetween(project.workspace.requirements,rebased);
+            if(!changes.length&&!meta)return project;
+            try{return accept(await rpc('save',{changes,metadata:meta,expectedVersion:project.version}));}
+            catch(error){
+              if(error.code!=='CONFLICT')throw error;
+              accept(await rpc('load'));
+              if(attempt)throw core.conflictError();
+            }
+          }
+        }finally{busy=false;}
+      });
+      saveQueue=operation.catch(()=>{});
+      return operation;
     },
     async upload(file,kind){
       const bytes=new Uint8Array(await file.arrayBuffer());let binary='';
@@ -144,6 +177,7 @@
     },
     async refresh(){return accept(await rpc('load'));},
     disconnect(){clearInterval(timer);token='';role='';},
+    knownProjects(){return directory?.list()||[];},
     shareUrl(){const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('project',project.id);return url.href;},
     fields
   };

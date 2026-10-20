@@ -331,6 +331,13 @@ html:has(body.editorial-app) { min-width:0; }
 .editorial-app .toast strong { font-size:14px;font-weight:500; }
 .editorial-app .toast p { font-size:12px;line-height:1.7;color:var(--muted); }
 .editorial-app .ui-dialog-actions { display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:24px;padding-top:18px;border-top:1px solid var(--line); }
+.editorial-app .shared-project-row { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--line); }
+.editorial-app .shared-project-row>div { min-width:0; }
+.editorial-app .shared-project-row h4 { margin:0 0 6px;font-size:17px;overflow-wrap:anywhere; }
+.editorial-app .shared-project-row p { margin:0;font-size:13px; }
+.editorial-app .shared-project-row button { flex-shrink:0; }
+.editorial-app .shared-project-link { display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-top:20px; }
+.editorial-app .pages-modal .shared-project-link .pages-field { flex:1 1 220px;min-width:0;margin:0; }
 .editorial-app .ui-confirm-copy { white-space:pre-wrap;font-size:15px;line-height:1.9; }
 .editorial-app .ui-form-heading { margin-bottom:5px; }
 .editorial-app .ui-form-intro { margin:0 0 24px;font-size:13px;color:var(--muted);line-height:1.8; }

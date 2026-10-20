@@ -1099,11 +1099,15 @@ async function requestEasyExplanation() {
 }
 
 let savedEditorSnapshot = '';
+let editorSaveInProgress = false;
+let editingBase = null;
 function editorSnapshot() {
   return JSON.stringify({fields:[...elements.requirementForm.elements].filter(input=>input.id.startsWith('form')).map(input=>[input.id,input.value]).sort((a,b)=>a[0].localeCompare(b[0])),questions:state.draftQuestions,glossary:state.draftGlossary});
 }
 async function confirmEditorLeave() {
+  if (editorSaveInProgress) return false;
   if (!elements.detailDrawer.classList.contains('open') || !savedEditorSnapshot || editorSnapshot() === savedEditorSnapshot) return true;
+  if (window.ReqlyDesign?.unsavedChanges) return window.ReqlyDesign.unsavedChanges(() => saveRequirement());
   return window.ReqlyDesign ? window.ReqlyDesign.confirm('작성 중인 내용이 있습니다','저장하지 않은 변경사항을 버리고 이동할까요?') : window.confirm('저장하지 않은 변경사항을 버리고 이동할까요?');
 }
 async function openDrawer(key = null, force = false) {
@@ -1114,6 +1118,7 @@ async function openDrawer(key = null, force = false) {
     confidence: 100, source: '수동 추가', acceptance: '미검토', completion: '미완료', tags: [],
   });
   if (!item) return;
+  editingBase=structuredClone(item);
   state.editingRevision=item.revision||0;
   const lastSaved=document.getElementById('lastSavedAt');
   if(lastSaved)lastSaved.textContent=`마지막 저장: ${item.savedAt?new Date(item.savedAt).toLocaleString('ko-KR'):'없음'}`;
@@ -1190,6 +1195,7 @@ async function closeDrawer(force = false) {
   state.draftExplanationSources = [];
   state.glossaryDetectionRequested = false;
   savedEditorSnapshot = '';
+  editingBase = null;
   syncCurrentRequirement();
   window.ReqlyDesign?.sync();
 }
@@ -1224,20 +1230,21 @@ function updateCounts() {
 }
 
 async function saveRequirement(event) {
-  event.preventDefault();
+  event?.preventDefault();
+  if (editorSaveInProgress) return false;
   const id = elements.formId.value.trim();
   const duplicate = id && state.requirements.some(item => item.id.toLocaleLowerCase('ko') === id.toLocaleLowerCase('ko') && item.key !== state.editingKey);
   if (duplicate) {
     elements.idError.textContent = '이미 사용 중인 고유번호입니다.';
     const section=elements.formId.closest('details');if(section)section.open=true;
     elements.formId.focus();
-    return;
+    return false;
   }
-  if (!elements.requirementForm.reportValidity()) return;
+  if (!elements.requirementForm.reportValidity()) return false;
   const previous = state.requirements.find(item => item.key === state.editingKey);
   const nextSourceOrder = state.requirements.reduce((max, item) => Math.max(max, Number(item.sourceOrder) || 0), 0) + 1;
   const requirement = normalizeRequirement({
-    ...(previous || {}), key: previous?.key || makeKey(), id, revision:state.editingRevision||0,
+    ...(editingBase || {}), key: state.editingKey || makeKey(), id, revision:state.editingRevision||0,
     sourceOrder: previous?.sourceOrder ?? nextSourceOrder,
     name: elements.formName.value.trim(), description: elements.formDescription.value.trim(),
     easyExplanation: elements.formEasyExplanation.value.trim(),
@@ -1251,18 +1258,32 @@ async function saveRequirement(event) {
     manualGlossary: state.draftGlossary,
     questions: state.draftQuestions.filter(question => question.question.trim()).map(question => ({ ...question, question: question.question.trim(), answer: question.answer.trim() })),
   });
-  if(window.ReqlyShared?.enabled){
-    const button=elements.requirementForm.querySelector('[type="submit"]');button.disabled=true;
-    try { await window.ReqlyShared.saveItems([requirement]); render(); await refreshSavedEditor(requirement.key); showToast('요구사항을 저장했습니다', requirement.name); }
-    catch(error){showToast('저장하지 못했습니다',error.message,true);}
-    finally{button.disabled=false;}
-    return;
+  const button=elements.requirementForm.querySelector('[type="submit"]');
+  editorSaveInProgress=true;button.disabled=true;
+  const controls=[...elements.requirementForm.elements].map(control=>[control,control.disabled]);
+  controls.forEach(([control])=>control.disabled=true);
+  try {
+    if(window.ReqlyShared?.enabled){
+      const merged=window.ReqlySharedCore.mergeEdits(state.editingKey?editingBase:null,requirement,previous);
+      if(merged.conflicts.length)throw window.ReqlySharedCore.conflictError(merged.conflicts);
+      await window.ReqlyShared.saveItems([merged.item]);
+    }else{
+      requirement.savedAt=new Date().toISOString();
+      const requirements=previous ? state.requirements.map(item=>item.key===previous.key?requirement:item) : [...state.requirements,requirement];
+      // Await durable storage before replacing state or allowing navigation.
+      await window.ReqlyPortal.saveNow({projectId:state.projectId,document:state.document,references:state.references,requirements});
+      state.requirements=requirements;
+    }
+    render();await refreshSavedEditor(requirement.key);
+    showToast(previous ? '요구사항을 수정했습니다' : '요구사항을 추가했습니다', `${requirement.id || 'ID 없음'} · ${requirement.name}`);
+    return true;
+  }catch(error){
+    showToast('저장하지 못했습니다',error.message,true);
+    return false;
+  }finally{
+    controls.forEach(([control,disabled])=>control.disabled=disabled);
+    editorSaveInProgress=false;button.disabled=false;
   }
-  requirement.savedAt=new Date().toISOString();
-  if (previous) state.requirements = state.requirements.map(item => item.key === previous.key ? requirement : item);
-  else state.requirements.push(requirement);
-  saveWorkspace(); render(); await refreshSavedEditor(requirement.key);
-  showToast(previous ? '요구사항을 수정했습니다' : '요구사항을 추가했습니다', `${requirement.id || 'ID 없음'} · ${requirement.name}`);
 }
 
 async function deleteRequirement(key = state.editingKey) {
@@ -1275,11 +1296,12 @@ async function deleteRequirement(key = state.editingKey) {
 }
 
 async function duplicateRequirement() {
+  if (!state.editingKey) return;
+  if (!(await confirmEditorLeave())) return;
   const item = state.requirements.find(req => req.key === state.editingKey);
   if (!item) return;
-  if (!(await confirmEditorLeave())) return;
   const nextSourceOrder = state.requirements.reduce((max, requirement) => Math.max(max, Number(requirement.sourceOrder) || 0), 0) + 1;
-  const copy = normalizeRequirement({ ...item, key: makeKey(), sourceOrder: nextSourceOrder, id: '', name: `${item.name} (복사본)`, status: '검토 전', flag: '', completion: '미완료', createdAt: new Date().toISOString() });
+  const copy = normalizeRequirement({ ...item, key: makeKey(), revision:0, savedAt:'', sourceOrder: nextSourceOrder, id: '', name: `${item.name} (복사본)`, status: '검토 전', flag: '', completion: '미완료', createdAt: new Date().toISOString() });
   state.requirements.push(copy); saveWorkspace(); render(); openDrawer(copy.key, true);
   showToast('요구사항을 복제했습니다', '원문에 없는 ID는 만들지 않았습니다. 필요하면 RFP의 ID를 직접 입력하세요.');
 }
@@ -1682,6 +1704,8 @@ window.ReqlyApp={get projectId(){return state.projectId;},get document(){return 
   get references(){return structuredClone(state.references);},
   get questionHistory(){return structuredClone(state.document?.qaHistory||[]);},
   openRequirement:openDrawer,
+  confirmLeave:confirmEditorLeave,
+  allowNavigation(){savedEditorSnapshot='';},
   refreshView:render,
   refreshList:renderRequirements,
   get filterCount(){return ['category','status','priority','flag'].filter(key=>state[key]!=='all').length+(state.idPath.length?1:0);},
