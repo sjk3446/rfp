@@ -90,6 +90,7 @@
       await dbPut(currentProject);
       const label = document.getElementById('sidebarProject');
       if (label) label.textContent = name;
+      window.ReqlyDesign?.sync();
     }, 180);
   }
 
@@ -313,6 +314,7 @@
   }
 
   async function extractExcel(file){
+    if(!window.XLSX)await window.ReqlyParserLibraries.load('XLSX');
     if(!window.XLSX)throw new Error('Excel 분석 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.');
     const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const structured=[];const fallback=[],fullText=[];
     for(const sheetName of workbook.SheetNames){const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:'',raw:false});let headerIndex=-1,map={};for(let i=0;i<Math.min(rows.length,80);i++){const found={};rows[i].forEach((cell,col)=>{const field=matchHeader(cell);if(field&&!Object.hasOwn(found,field))found[field]=col;});if((found.name!==undefined||found.description!==undefined)&&(found.id!==undefined||(found.name!==undefined&&found.description!==undefined))){headerIndex=i;map=found;break;}}
@@ -325,6 +327,7 @@
   }
 
   async function extractZipXml(file,kind){
+    if(!window.JSZip)await window.ReqlyParserLibraries.load('JSZip');
     if(!window.JSZip)throw new Error('압축 문서 분석 도구를 불러오지 못했습니다.');const zip=await JSZip.loadAsync(await file.arrayBuffer());const lines=[];let pages=1;
     if(kind==='pptx'){const names=Object.keys(zip.files).filter(n=>/^ppt\/slides\/slide\d+\.xml$/i.test(n)).sort((a,b)=>(Number(a.match(/\d+/)?.[0]))-(Number(b.match(/\d+/)?.[0])));pages=Math.max(1,names.length);for(let i=0;i<names.length;i++){const xml=await zip.file(names[i]).async('text');const doc=new DOMParser().parseFromString(xml,'application/xml');lines.push(`[[PAGE:${i+1}]]`,...[...doc.getElementsByTagNameNS('*','t')].map(n=>n.textContent).filter(Boolean));}}
     else {const names=Object.keys(zip.files).filter(n=>/^Contents\/section\d+\.xml$/i.test(n)).sort();pages=Math.max(1,names.length);for(const name of names){const xml=await zip.file(name).async('text');const doc=new DOMParser().parseFromString(xml,'application/xml');lines.push(...[...doc.getElementsByTagNameNS('*','t')].map(n=>n.textContent).filter(Boolean));}}
@@ -335,6 +338,7 @@
     const ext=file.name.split('.').pop().toLowerCase();
     if(['xlsx','xlsm','xls','csv','tsv'].includes(ext))return extractExcel(file);
     if(ext==='pdf'){
+      if(!window.pdfjsLib)await window.ReqlyParserLibraries.load('pdfjsLib');
       if(!window.pdfjsLib)throw new Error('PDF 분석 도구를 불러오지 못했습니다.');
       pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
       const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
@@ -352,7 +356,7 @@
       } finally {await pdf.destroy();}
       return{text:pages.join('\n'),pages:count};
     }
-    if(ext==='docx'){if(!window.mammoth)throw new Error('Word 분석 도구를 불러오지 못했습니다.');const out=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});return{text:out.value,pages:1};}
+    if(ext==='docx'){await window.ReqlyParserLibraries.load('mammoth');if(!window.mammoth)throw new Error('Word 분석 도구를 불러오지 못했습니다.');const out=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});return{text:out.value,pages:1};}
     if(ext==='pptx'||ext==='hwpx')return extractZipXml(file,ext);
     if(ext==='hwp')throw new Error('구형 HWP는 브라우저에서 직접 읽을 수 없습니다. HWPX, PDF 또는 DOCX로 저장한 뒤 올려 주세요.');
     const buffer=await file.arrayBuffer();let text;for(const encoding of ['utf-8','euc-kr']){try{text=new TextDecoder(encoding,{fatal:true}).decode(buffer);break;}catch(_){}}return{text:text||new TextDecoder().decode(buffer),pages:1};
@@ -389,7 +393,7 @@
         return jsonResponse({easyExplanation:result.text,explanationSources:result.sources||[]});
       }
       if(path.endsWith('/api/glossary')){const body=JSON.parse(options.body||'{}');try{const result=await aiGenerate('glossary',{terms:body.terms,context:String(body.context||'').slice(0,10000)});return jsonResponse({results:result.results||[]});}catch(error){if(helperToken || window.ReqlyPersistentAI)throw error;const results=[];for(const term of (body.terms||[]).slice(0,10)){try{const api=`https://ko.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json&origin=*`;const data=await nativeFetch(api).then(r=>r.json());const pages=Object.values(data.query?.pages||{}).sort((a,b)=>(a.index||0)-(b.index||0));results.push({term,candidates:pages.map((p,i)=>({full:p.title,meaning:clean(p.extract).slice(0,650)||'설명이 없습니다.',source:'위키백과',sourceUrl:p.fullurl,score:100-i}))});}catch(_e){results.push({term,candidates:[]});}}return jsonResponse({results});}}
-      if(path.endsWith('/api/export-questions')){if(!window.XLSX)throw new Error('Excel 생성 도구를 불러오지 못했습니다.');const body=JSON.parse(options.body||'{}');const rows=[['RFP 원문 순서','요구사항 ID','요구사항 명칭','분류','관점','질의사항','답변']];for(const req of body.requirements||[])for(const q of req.questions||[])rows.push([req.sourceOrder,req.id,req.name,req.category,q.perspective,q.question,q.answer]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'질의응답');const data=XLSX.write(wb,{type:'array',bookType:'xlsx'});return new Response(data,{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}});}
+if(path.endsWith('/api/export-questions')){await window.ReqlyParserLibraries.load('XLSX');if(!window.XLSX)throw new Error('Excel 생성 도구를 불러오지 못했습니다.');const body=JSON.parse(options.body||'{}');const rows=[['RFP 원문 순서','요구사항 ID','요구사항 명칭','분류','관점','질의사항','답변']];for(const req of body.requirements||[])for(const q of req.questions||[])rows.push([req.sourceOrder,req.id,req.name,req.category,q.perspective,q.question,q.answer]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'질의응답');const data=XLSX.write(wb,{type:'array',bookType:'xlsx'});return new Response(data,{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}});}
       return jsonResponse({error:'지원하지 않는 로컬 API입니다.'},404);
     }catch(error){return jsonResponse({error:error.message||String(error)},400);}
   }
@@ -418,6 +422,12 @@
     saveWorkspace(workspace){
       if(window.ReqlyShared?.enabled) return window.ReqlyShared.saveItems(workspace.requirements);
       scheduleSave(workspace);
+    },
+    async saveNow(workspace){
+      if(!currentProject||workspace.projectId!==currentProject.id)throw new Error('프로젝트가 변경되어 저장하지 못했습니다.');
+      clearTimeout(saveTimer);
+      const next={...currentProject,updatedAt:now(),workspace:structuredClone(workspace)};
+      await dbPut(next);currentProject=next;
     }
   };
 })();

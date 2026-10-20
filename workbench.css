@@ -355,6 +355,8 @@ html:has(body.editorial-app) { min-width:0; }
 .editorial-app .full-list .workbench-editor,.editorial-app .full-list .compact-list { display:none; }
 .editorial-app .full-list .table-wrap { display:block!important;overflow:auto; }
 .editorial-app .full-list .requirement-list-panel { border-right:0;background:var(--paper); }
+.editorial-app .full-list.editor-open .requirement-list-panel { display:flex; }
+.editorial-app .full-list.editor-open .workbench-editor { display:none; }
 .editorial-app .full-list .table-wrap { flex:1;min-height:0; }
 .editorial-app .full-list .toolbar { flex-direction:row;align-items:center; }
 .editorial-app .full-list .search-box { max-width:600px;flex:1; }

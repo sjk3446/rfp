@@ -288,6 +288,7 @@ function normalizeRequirement(item, index = 0) {
     flag: FLAG_OPTIONS.some(option => option.value === item.flag) ? item.flag : '',
     confidence: Number.isFinite(Number(item.confidence)) ? Number(item.confidence) : 100,
     source: item.source || '수동 추가', section: item.section || '수동 등록', basis: item.basis || '수동 등록',
+    aiEvidence: item.aiEvidence || null,
     tags: Array.isArray(item.tags) ? item.tags : [],
     acceptance: item.acceptance || '미검토', applicationPlan: item.applicationPlan || '', owner: item.owner || '',
     changeHistory: item.changeHistory || '', completion: item.completion || '미완료',
@@ -376,12 +377,22 @@ async function updateRequirementFlag(key, flag = null) {
   }catch(error){state.requirements=window.ReqlyShared?.enabled?window.ReqlyShared.project.workspace.requirements.map(normalizeRequirement):previous;renderRequirements();showToast('플래그를 저장하지 못했습니다',error.message,true);}
 }
 
+// Requirement edits replace records; weak keys naturally discard stale search indexes.
+const requirementSearchIndex = new WeakMap();
+const requirementCollator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
+let renderedRequirementKeys = [];
+function searchableRequirement(item) {
+  if (!requirementSearchIndex.has(item)) {
+    requirementSearchIndex.set(item, [item.id, item.name, item.description, item.owner, ...(item.tags || []),
+      ...(item.manualGlossary || []).flatMap(entry => [entry.term, entry.full, entry.meaning]),
+      ...(item.questions || []).flatMap(question => [question.question, question.answer])].join(' ').toLowerCase());
+  }
+  return requirementSearchIndex.get(item);
+}
 function filteredRequirements() {
   const query = state.query.trim().toLowerCase();
   const list = state.requirements.filter(item => {
-    const questionText = (item.questions || []).flatMap(question => [question.question, question.answer]);
-    const glossaryText = (item.manualGlossary || []).flatMap(entry => [entry.term, entry.full, entry.meaning]);
-    const matchesQuery = !query || [item.id, item.name, item.description, item.owner, ...(item.tags || []), ...glossaryText, ...questionText].join(' ').toLowerCase().includes(query);
+    const matchesQuery = !query || searchableRequirement(item).includes(query);
     return matchesQuery && (state.category === 'all' || item.category === state.category)
       && (state.status === 'all' || item.status === state.status)
       && (state.priority === 'all' || item.priority === state.priority)
@@ -393,7 +404,7 @@ function filteredRequirements() {
     let comparison = 0;
     if (state.sort === 'flag') comparison = (FLAG_ORDER[left || ''] || 0) - (FLAG_ORDER[right || ''] || 0);
     else if (state.sort === 'confidence' || state.sort === 'sourceOrder') comparison = Number(left) - Number(right);
-    else comparison = String(left || '').localeCompare(String(right || ''), 'ko', { numeric: true, sensitivity: 'base' });
+    else comparison = requirementCollator.compare(String(left || ''), String(right || ''));
     return (comparison * state.sortDirection) || (Number(a.sourceOrder) - Number(b.sourceOrder));
   });
 }
@@ -504,6 +515,9 @@ function renderIdHierarchyControls() {
 
 function renderRequirements() {
   const items = filteredRequirements();
+  renderedRequirementKeys = items.map(item => item.key);
+  const workbench = Boolean($('workbenchList'));
+  const tableView = !workbench || document.querySelector('.content-card').classList.contains('full-list');
   const hasRequirements = state.requirements.length > 0;
   elements.requirementsBody.closest('.table-wrap').style.display = hasRequirements ? '' : 'none';
   elements.mobileList.style.display = hasRequirements ? '' : 'none';
@@ -517,24 +531,26 @@ function renderRequirements() {
     : '업로드한 RFP에서 추출한 요구사항을 검토하고 관리하세요.';
 
   if (!items.length && hasRequirements) {
-    elements.requirementsBody.innerHTML = `<tr><td colspan="9"><div class="no-results">검색 조건에 맞는 요구사항이 없습니다.</div></td></tr>`;
-    elements.mobileList.innerHTML = '<div class="no-results">검색 조건에 맞는 요구사항이 없습니다.</div>';
+    elements.requirementsBody.innerHTML = tableView ? `<tr><td colspan="9"><div class="no-results">검색 조건에 맞는 요구사항이 없습니다.</div></td></tr>` : '';
+    elements.mobileList.innerHTML = !workbench ? '<div class="no-results">검색 조건에 맞는 요구사항이 없습니다.</div>' : '';
   } else {
-    elements.requirementsBody.innerHTML = items.map(item => requirementRow(item)).join('');
-    elements.mobileList.innerHTML = items.map(item => mobileRequirement(item)).join('');
+    elements.requirementsBody.innerHTML = tableView ? items.map(requirementRow).join('') : '';
+    elements.mobileList.innerHTML = !workbench ? items.map(mobileRequirement).join('') : '';
   }
   const visibleKeys = items.map(item => item.key);
   elements.selectAll.checked = visibleKeys.length > 0 && visibleKeys.every(key => state.selected.has(key));
   elements.selectAll.indeterminate = visibleKeys.some(key => state.selected.has(key)) && !elements.selectAll.checked;
   document.querySelectorAll('.sort-button').forEach(button => button.classList.toggle('active', button.dataset.sort === state.sort));
   if (elements.sortFilter) elements.sortFilter.value = `${state.sort}:${state.sortDirection}`;
-  renderWorkbenchList(items);
+  if (workbench && tableView) $('workbenchList').replaceChildren();
+  else renderWorkbenchList(items);
   window.ReqlyDesign?.sync();
 }
 
 function renderWorkbenchList(items = filteredRequirements()) {
   const list = $('workbenchList');
   if (!list) return;
+  if (document.querySelector('.content-card').classList.contains('full-list')) return;
   list.innerHTML = items.map(item => `<article class="requirement-record ${item.key === state.editingKey ? 'is-current' : ''}">
     <input type="checkbox" class="row-check" data-key="${escapeHtml(item.key)}" ${state.selected.has(item.key) ? 'checked' : ''} aria-label="${escapeHtml(item.id || item.name)} 선택">
     <button type="button" class="record-open" data-open="${escapeHtml(item.key)}" ${item.key === state.editingKey ? 'aria-current="true"' : ''}>
@@ -547,13 +563,38 @@ function renderWorkbenchList(items = filteredRequirements()) {
   $('compactSelectAll').indeterminate = elements.selectAll.indeterminate;
 }
 
+function syncCurrentRequirement() {
+  const list = $('workbenchList');
+  if (!list) return;
+  list.querySelectorAll('.is-current').forEach(row => {
+    row.classList.remove('is-current');row.querySelector('[aria-current]')?.removeAttribute('aria-current');
+  });
+  if (state.editingKey) {
+    const opener = list.querySelector(`[data-open="${CSS.escape(state.editingKey)}"]`);
+    opener?.setAttribute('aria-current', 'true');opener?.closest('article').classList.add('is-current');
+  }
+}
+
+function syncRequirementSelection() {
+  document.querySelectorAll('.row-check').forEach(checkbox => {
+    const checked = state.selected.has(checkbox.dataset.key);
+    checkbox.checked = checked;checkbox.closest('tr')?.classList.toggle('selected', checked);
+  });
+  const all = renderedRequirementKeys.length > 0 && renderedRequirementKeys.every(key => state.selected.has(key));
+  const some = renderedRequirementKeys.some(key => state.selected.has(key));
+  [elements.selectAll, $('compactSelectAll')].filter(Boolean).forEach(control => {
+    control.checked = all;control.indeterminate = some && !all;
+  });
+  renderBulkBar();
+}
+
 function requirementRow(item) {
   const statusClass = item.status.replaceAll(' ', '-');
   const displayId = item.id || 'ID 없음';
   return `<tr data-key="${escapeHtml(item.key)}" class="${state.selected.has(item.key) ? 'selected' : ''}">
     <td class="check-cell"><input class="row-check" type="checkbox" data-key="${escapeHtml(item.key)}" ${state.selected.has(item.key) ? 'checked' : ''} aria-label="${escapeHtml(displayId)} 선택"></td>
     <td><span class="requirement-id ${item.id ? '' : 'missing'}">${escapeHtml(displayId)}</span></td>
-    <td><button class="name-button" data-open="${escapeHtml(item.key)}"><span class="requirement-name">${escapeHtml(item.name)}</span><span class="requirement-description">${escapeHtml(item.description)}</span></button></td>
+    <td><button class="name-button" data-open="${escapeHtml(item.key)}"><span class="requirement-name">${escapeHtml(item.name)}</span><span class="requirement-description">${escapeHtml(String(item.description || '').slice(0,240))}${item.description?.length > 240 ? '…' : ''}</span></button></td>
     <td><span class="category-chip cat-${escapeHtml(item.category)}">${escapeHtml(item.category)} <small>${categoryCode(item.category)}</small></span></td>
     <td><span class="priority-chip priority-${escapeHtml(item.priority)}">${escapeHtml(item.priority)}</span></td>
     <td><span class="status-chip status-${statusClass}">${escapeHtml(item.status)}</span></td>
@@ -1124,10 +1165,12 @@ async function openDrawer(key = null, force = false) {
   elements.detailDrawer.classList.add('open');
   elements.detailDrawer.setAttribute('aria-hidden', 'false');
   $('lastSavedAt').classList.remove('unsaved-state');
+  const wasTableView = document.querySelector('.content-card').classList.contains('full-list');
   document.querySelector('.content-card').classList.remove('full-list');
   if ($('listViewToggle')) $('listViewToggle').textContent='전체 표 보기';
   savedEditorSnapshot = editorSnapshot();
-  renderWorkbenchList();
+  if (wasTableView) renderRequirements();
+  else syncCurrentRequirement();
   window.ReqlyDesign?.sync();
   if (matchMedia('(max-width:700px)').matches) elements.detailDrawer.scrollIntoView({block:'start'});
   // Do not force focus after the drawer animation. In Korean IME environments,
@@ -1147,7 +1190,7 @@ async function closeDrawer(force = false) {
   state.draftExplanationSources = [];
   state.glossaryDetectionRequested = false;
   savedEditorSnapshot = '';
-  renderWorkbenchList();
+  syncCurrentRequirement();
   window.ReqlyDesign?.sync();
 }
 
@@ -1307,7 +1350,7 @@ async function analyzeFiles(files, storedAssetId = '') {
     if(merged.unresolved.length){
       throw new Error(`ID 대응이 불명확한 항목 ${merged.unresolved.length}개가 있습니다. 기존 내용은 유지했습니다. 현재 버전에서는 ID를 확인한 뒤 다시 분석해 주세요.`);
     }
-    const documentInfo={...payload.document,demo:false,assetId,overviewByAsset:state.document?.overviewByAsset||{}};
+    const documentInfo={...payload.document,demo:false,assetId,overviewByAsset:state.document?.overviewByAsset||{},qaHistory:state.document?.qaHistory||[]};
     if(window.ReqlyShared?.enabled) await window.ReqlyShared.saveItems(merged.requirements,{document:documentInfo,references:state.references});
     state.document = documentInfo;
     state.requirements = (window.ReqlyShared?.enabled ? window.ReqlyShared.project.workspace.requirements : merged.requirements).map(normalizeRequirement);
@@ -1500,7 +1543,11 @@ function bindEvents() {
     renderQuestions();
   });
   elements.formId.addEventListener('input', () => { elements.idError.textContent = ''; });
-  elements.searchInput.addEventListener('input', event => { state.query = event.target.value; renderRequirements(); });
+  let searchFrame = 0, composingSearch = false;
+  const queueSearch = () => { cancelAnimationFrame(searchFrame);searchFrame = requestAnimationFrame(renderRequirements); };
+  elements.searchInput.addEventListener('compositionstart', () => { composingSearch = true;cancelAnimationFrame(searchFrame); });
+  elements.searchInput.addEventListener('compositionend', event => { composingSearch = false;state.query = event.target.value;queueSearch(); });
+  elements.searchInput.addEventListener('input', event => { state.query = event.target.value;if (!composingSearch && !event.isComposing) queueSearch(); });
   elements.categoryFilter.addEventListener('change', event => { state.category = event.target.value; render(); });
   elements.statusFilter.addEventListener('change', event => { state.status = event.target.value; renderRequirements(); });
   elements.priorityFilter.addEventListener('change', event => { state.priority = event.target.value; renderRequirements(); });
@@ -1533,10 +1580,10 @@ function bindEvents() {
   });
   elements.requirementsBody.addEventListener('change', event => {
     const checkbox = event.target.closest('.row-check'); if (!checkbox) return;
-    checkbox.checked ? state.selected.add(checkbox.dataset.key) : state.selected.delete(checkbox.dataset.key); renderRequirements(); renderBulkBar();
+    checkbox.checked ? state.selected.add(checkbox.dataset.key) : state.selected.delete(checkbox.dataset.key); syncRequirementSelection();
   });
   elements.selectAll.addEventListener('change', event => {
-    filteredRequirements().forEach(item => event.target.checked ? state.selected.add(item.key) : state.selected.delete(item.key)); renderRequirements(); renderBulkBar();
+    filteredRequirements().forEach(item => event.target.checked ? state.selected.add(item.key) : state.selected.delete(item.key)); syncRequirementSelection();
   });
   elements.bulkApply.addEventListener('click', async () => {
     const priority = elements.bulkPriority.value;
@@ -1631,12 +1678,52 @@ async function init() {
 document.addEventListener('DOMContentLoaded', init);
 
 window.ReqlyApp={get projectId(){return state.projectId;},get document(){return state.document;},
+  get requirements(){return structuredClone(state.requirements);},get categories(){return CATEGORIES.map(category=>category.name);},
+  get references(){return structuredClone(state.references);},
+  get questionHistory(){return structuredClone(state.document?.qaHistory||[]);},
   openRequirement:openDrawer,
   refreshView:render,
+  refreshList:renderRequirements,
+  get filterCount(){return ['category','status','priority','flag'].filter(key=>state[key]!=='all').length+(state.idPath.length?1:0);},
   isEditorDirty(){return Boolean(savedEditorSnapshot&&elements.detailDrawer.classList.contains('open')&&editorSnapshot()!==savedEditorSnapshot);},
   setFlag:updateRequirementFlag,
-  selectRequirement(key,checked){checked?state.selected.add(key):state.selected.delete(key);renderRequirements();renderBulkBar();},
+  selectRequirement(key,checked){checked?state.selected.add(key):state.selected.delete(key);syncRequirementSelection();},
   stepRequirement(direction){const items=filteredRequirements();const index=items.findIndex(item=>item.key===state.editingKey);if(items.length)openDrawer(items[(index+direction+items.length)%items.length].key);},
+  async updateProjectQuestions(add,remove,projectId){
+    if(!window.ReqlyShared?.enabled)throw new Error('프로젝트 공유는 공유 프로젝트에서 사용할 수 있습니다.');
+    if(add.some(record=>!record?.id||!record.question||!Array.isArray(record.answer?.claims)))throw new Error('질의응답 저장 내용이 올바르지 않습니다.');
+    for(let attempt=0;attempt<2;attempt++){
+      if(projectId!==state.projectId)throw new Error('프로젝트가 변경되어 히스토리에 저장하지 못했습니다.');
+      if(!window.ReqlyShared?.enabled)throw new Error('공유 프로젝트 연결을 확인해 주세요.');
+      const history=(state.document?.qaHistory||[]).filter(record=>!remove.includes(record.id));
+      const records=new Map(history.map(record=>[record.id,record]));add.forEach(record=>{const clean=structuredClone(record);delete clean.visibility;records.set(clean.id,clean);});
+      const documentInfo={...(state.document||{name:window.ReqlyPortal?.project?.name||'프로젝트',type:'PROJECT'}),qaHistory:[...records.values()]};
+      if(window.ReqlyShared?.enabled){
+        try{await window.ReqlyShared.saveItems([],{document:documentInfo,references:state.references});return;}
+        catch(error){if(error.code==='CONFLICT'&&attempt===0){await window.ReqlyShared.refresh();continue;}throw error;}
+      }
+    }
+  },
+  async importAiRequirements(assetId,candidates,projectId,model){
+    if(projectId!==state.projectId)throw new Error('프로젝트가 변경되었습니다. 현재 프로젝트에서 다시 열어 주세요.');
+    if(!(await confirmEditorLeave()))return{cancelled:true};
+    window.ReqlyFiles.setProject(projectId);
+    const file=(await window.ReqlyFiles.list()).find(item=>item.id===assetId&&item.kind==='rfp');
+    if(!file||projectId!==state.projectId)throw new Error('분석한 RFP 또는 프로젝트를 다시 확인해 주세요.');
+    const plan=window.ReqlyRequirementAI.plan(state.requirements,candidates,assetId);
+    if(!plan.added.length)return{added:0,skipped:plan.skipped.length};
+    let order=state.requirements.reduce((max,item)=>Math.max(max,Number(item.sourceOrder)||0),0);
+    const items=plan.added.map(candidate=>normalizeRequirement({
+      key:makeKey(),id:candidate.id,name:candidate.name,description:candidate.quote,category:candidate.category,
+      sourceOrder:++order,source:file.name,section:candidate.sourceLabel,basis:`AI 추출 · ${candidate.sourceLabel} · 원문 근거 검토`,confidence:65,
+      aiEvidence:{assetId,candidateId:candidate.id,candidateName:candidate.name,quote:candidate.quote,sourceId:candidate.sourceId,page:candidate.page,sheet:candidate.sheet,model,analyzedAt:new Date().toISOString()}
+    }));
+    const documentInfo=state.document||{name:file.name,type:file.name.split('.').pop().toUpperCase(),size:file.size,assetId,demo:false};
+    if(window.ReqlyShared?.enabled)await window.ReqlyShared.saveItems(items,{document:documentInfo,references:state.references});
+    else{state.document=documentInfo;state.requirements.push(...items);saveWorkspace();}
+    await closeDrawer(true);resetFilters(false);render();
+    return{added:items.length,skipped:plan.skipped.length};
+  },
   async saveOverview(assetId,result,expectedSavedAt){
     const existing=state.document?.overviewByAsset?.[assetId];
     if((existing?.savedAt||'')!==(expectedSavedAt||''))throw new Error('다른 사람이 사업 정보를 먼저 저장했습니다. 최신 결과를 확인해 주세요.');
@@ -1650,7 +1737,7 @@ window.addEventListener('reqly-shared-update',event=>{
   if(!elements.requirementsBody)return;
   const workspace=event.detail.project.workspace;
   restoreWorkspace(workspace);
-  if(!state.editingKey)render();else{renderDocument();renderReferences();renderMetrics();renderCategoryControls();renderWorkbenchList();}
+  if(!state.editingKey)render();else{renderDocument();renderReferences();renderMetrics();renderCategoryControls();renderIdHierarchyControls();renderRequirements();renderBulkBar();}
   const latest=workspace.requirements.find(item=>item.key===state.editingKey);
   const label=document.getElementById('lastSavedAt');
   if(label&&latest){label.textContent=`마지막 저장: ${latest.savedAt?new Date(latest.savedAt).toLocaleString('ko-KR'):'없음'}${latest.revision!==state.editingRevision?' · 최신 저장이 있음':''}`;label.dataset.savedLabel=label.textContent;window.ReqlyDesign?.markDirty();}

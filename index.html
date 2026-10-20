@@ -8,8 +8,10 @@
   <link rel="stylesheet" href="./styles.css?v=5.0.1">
   <link rel="stylesheet" href="./overview.css?v=5.2.2">
   <link rel="stylesheet" href="./file-manager.css?v=5.3.0">
-  <link rel="stylesheet" href="./workbench.css?v=6.2.1">
-  <link rel="stylesheet" href="./kasbah.css?v=6.3.1">
+  <link rel="stylesheet" href="./workbench.css?v=6.5.1">
+  <link rel="stylesheet" href="./kasbah.css?v=6.5.1">
+  <link rel="stylesheet" href="./requirement-ai.css?v=6.4.0">
+  <link rel="stylesheet" href="./project-qa.css?v=6.5.0">
 </head>
 <body class="editorial-app kasbah-theme">
   <svg class="svg-sprite" aria-hidden="true">
@@ -141,7 +143,7 @@
           </div>
 
           <div class="toolbar">
-            <label class="search-box"><svg><use href="#i-search"></use></svg><input id="searchInput" type="search" placeholder="고유번호, 명칭, 상세 설명 검색" autocomplete="off"><kbd>⌘ K</kbd></label>
+            <label class="search-box"><svg><use href="#i-search"></use></svg><input id="searchInput" type="search" placeholder="고유번호, 명칭, 상세 설명 검색" autocomplete="off" aria-label="요구사항 검색 또는 AI 질문"><kbd>⌘ K</kbd></label>
             <div class="filter-group">
               <label class="select-wrap"><span class="sr-only">분류</span><select id="categoryFilter"><option value="all">전체 분류</option></select></label>
               <label class="select-wrap"><span class="sr-only">상태</span><select id="statusFilter"><option value="all">전체 상태</option><option>검토 전</option><option>검토 중</option><option>확정</option></select></label>
@@ -301,20 +303,22 @@
   </div>
 
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script src="./parser-libraries.js?v=6.5.1"></script>
   <script src="./document-parser.js?v=4.0.3"></script>
   <script src="./shared-core.js?v=5.0.0"></script>
   <script src="./cloud-config.js?v=5.0.2"></script>
   <script src="./shared-runtime.js?v=6.0.2"></script>
-  <script src="./persistent-ai.js?v=6.3.3"></script>
-  <script src="./file-runtime.js?v=6.0.2"></script>
-  <script src="./pages-runtime.js?v=6.0.5"></script>
-  <script src="./overview-core.js?v=6.3.3"></script>
-  <script src="./app.js?v=6.2.1"></script>
+  <script src="./persistent-ai.js?v=6.5.0"></script>
+  <script src="./file-runtime.js?v=6.5.1"></script>
+  <script src="./pages-runtime.js?v=6.5.1"></script>
+  <script src="./overview-core.js?v=6.4.0"></script>
+  <script src="./requirement-ai-core.js?v=6.4.0"></script>
+  <script src="./app.js?v=6.5.1"></script>
   <script src="./overview-runtime.js?v=6.3.3"></script>
-  <script src="./workbench.js?v=6.3.1"></script>
+  <script src="./workbench.js?v=6.5.1"></script>
+  <script src="./requirement-ai-runtime.js?v=6.4.0"></script>
+  <script src="./project-qa-core.js?v=6.5.0"></script>
+  <script src="./project-qa-store.js?v=6.5.0"></script>
+  <script src="./project-qa-runtime.js?v=6.5.0"></script>
 </body>
 </html>

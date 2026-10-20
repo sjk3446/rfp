@@ -17,8 +17,10 @@
     const brand=document.querySelector('.brand');
     const logo=element('img','muhammad-portrait');logo.src='./assets/muhammad-portrait-02.png';logo.alt='';logo.width=56;logo.height=56;
     const portrait=element('span','portrait-frame');portrait.append(logo);
-    brand.replaceChildren(portrait,element('span','brand-wordmark','Muhammad'));heading.prepend(brand);
     const title=top.querySelector('h1');title.id='workspaceProjectName';
+    title.className='workspace-project-name';
+    const identity=element('span','brand-identity');identity.append(element('span','brand-wordmark','Muhammad'));
+    brand.replaceChildren(portrait,identity);heading.prepend(brand);
     const bar=element('div','workspace-bar');bar.append(document.querySelector('.nav-list'));
     const progress=element('div','workspace-progress');progress.innerHTML='<span>검토 진행</span><progress max="100" value="0" aria-label="요구사항 검토 진행률"></progress><span data-progress-label>0%</span>';bar.append(progress);(document.querySelector('.kasbah-masthead')||top).after(bar);
     document.querySelector('.nav-label').textContent='프로젝트';
@@ -63,7 +65,7 @@
     const create=button('요구사항 직접 추가','button primary');create.onclick=()=>byId('addButton').click();idle.append(create);
     editor.append(idle,byId('detailDrawer'));workbench.append(list,editor);card.append(workbench);
     const full=button('전체 표 보기');full.id='listViewToggle';document.querySelector('.card-actions').prepend(full);
-    full.onclick=()=>{const on=card.classList.toggle('full-list');full.textContent=on?'목록·편집 보기':'전체 표 보기';};
+    full.onclick=()=>{const on=card.classList.toggle('full-list');full.textContent=on?'목록·편집 보기':'전체 표 보기';more.open=false;window.ReqlyApp?.refreshList();};
     byId('compactSelectAll').onchange=event=>{byId('selectAll').checked=event.target.checked;byId('selectAll').dispatchEvent(new Event('change',{bubbles:true}));};
     compact.onclick=event=>{
       const flag=event.target.closest('[data-flag-key]');if(flag){window.ReqlyApp?.setFlag(flag.dataset.flagKey);return;}
@@ -97,10 +99,10 @@
     const nameLabel=byId('formName').closest('label');nameLabel.classList.add('editor-name');byId('formName').setAttribute('form','requirementForm');byId('formName').setAttribute('aria-label','요구사항 명칭');
     byId('drawerTitle').classList.add('sr-only');byId('drawerTitle').after(nameLabel);
     byId('cancelButton').textContent='닫기';
-    const share=button('공유','button ghost share-project-button');share.id='shareProjectButton';share.hidden=true;share.onclick=()=>openShare();document.querySelector('.top-actions').append(share);
     // Three compact rows: identity/navigation, tools, then horizontal categories.
     document.body.classList.add('compact-shell');context.hidden=true;
     top.insertBefore(bar,document.querySelector('.top-actions'));
+    const projectHeading=element('div','header-project');projectHeading.append(element('span','header-project-label','현재 프로젝트'),title);top.insertBefore(projectHeading,document.querySelector('.top-actions'));
     card.prepend(toolbar);toolbar.classList.add('workspace-tools');
     filters.append(byId('idHierarchyFilter'));toolbar.after(filters);
     const actions=document.querySelector('.card-actions');toolbar.append(actions);
@@ -111,9 +113,23 @@
     window.addEventListener('reqly-shared-update',()=>sync());
     document.addEventListener('input',event=>{if(event.target.form===byId('requirementForm')||event.target.closest('#requirementForm')){markDirty();if(event.target.id==='formName')byId('drawerTitle').textContent=event.target.value||'새 요구사항 추가';}});
     document.addEventListener('change',event=>{if(event.target.form===byId('requirementForm')||event.target.closest('#requirementForm'))markDirty();});
-    new MutationObserver(()=>syncDialogs()).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
+    // Watch modal shells, not every row, keystroke and progress update in the app.
+    const modalObservers=new Map();
+    const watchDialogs=()=>{
+      for(const [modal,observer] of modalObservers)if(!modal.isConnected){observer.disconnect();modalObservers.delete(modal);}
+      document.querySelectorAll('.pages-modal').forEach(modal=>{
+        if(modalObservers.has(modal))return;
+        const observer=new MutationObserver(syncDialogs);observer.observe(modal,{attributes:true,attributeFilter:['class']});modalObservers.set(modal,observer);
+      });
+      syncDialogs();
+    };
+    new MutationObserver(watchDialogs).observe(document.body,{childList:true});watchDialogs();
+    let measureFrame=0,lastOffset='';
     const measure=()=>{
-      workbench.style.setProperty('--workbench-offset',`${workbench.getBoundingClientRect().top+window.scrollY}px`);
+      cancelAnimationFrame(measureFrame);measureFrame=requestAnimationFrame(()=>{
+        const offset=`${Math.round(workbench.getBoundingClientRect().top+window.scrollY)}px`;
+        if(offset!==lastOffset){lastOffset=offset;workbench.style.setProperty('--workbench-offset',offset);}
+      });
     };
     new ResizeObserver(measure).observe(document.querySelector('.main-area'));
     new ResizeObserver(measure).observe(classifications);
@@ -123,17 +139,17 @@
   function sync(){
     if(!initialized)return;
     const open=byId('detailDrawer').classList.contains('open');document.querySelector('.content-card').classList.toggle('editor-open',open);byId('editorIdle').hidden=open;
-    const project=byId('sidebarProject').textContent;byId('workspaceProjectName').textContent=project;byId('workspaceProjectName').title=project;
+    const project=window.ReqlyShared?.project?.name||window.ReqlyPortal?.project?.name||byId('sidebarProject').textContent;
+    byId('workspaceProjectName').textContent=project;byId('workspaceProjectName').title=project;document.querySelector('.brand').setAttribute('aria-label',`Muhammad 홈 · ${project}`);
     const percent=parseInt(byId('reviewProgressText').textContent)||0;document.querySelector('.workspace-progress progress').value=percent;document.querySelector('[data-progress-label]').textContent=percent+'%';
-    if(byId('shareProjectButton'))byId('shareProjectButton').hidden=!window.ReqlyShared?.enabled;
-    if(window.ReqlyShared?.enabled)byId('projectButton').querySelector('span').textContent='프로젝트 설정';
+    byId('projectButton').querySelector('span').textContent='프로젝트';
     if(open){
-      const id=byId('formId').value||'새 요구사항',category=byId('formCategory').value;
+      const id=byId('formId').value||(byId('deleteButton').style.display==='none'?'새 요구사항':'ID 없는 요구사항'),category=byId('formCategory').value;
       document.querySelector('.drawer-header .eyebrow').textContent=`${id} / ${category}`;
       byId('drawerTitle').textContent=byId('formName').value||'새 요구사항 추가';
       document.querySelectorAll('[data-editor-action]').forEach(button=>button.hidden=byId(button.dataset.editorAction).style.display==='none');
     }
-    const active=[...document.querySelectorAll('.filter-popover select')].filter(s=>s.value!=='all').length;
+    const active=window.ReqlyApp?.filterCount||0;
     byId('workbenchFilterToggle').textContent=active?`필터 ${active}`:'필터';
   }
   function topModal(){return [...document.querySelectorAll('.pages-modal.open')].at(-1);}
@@ -160,13 +176,6 @@
       const actions=element('div','ui-dialog-actions'),cancel=button('취소','pages-action'),done=button(confirm,'pages-action primary');done.type='submit';if(danger)done.style.background='var(--danger)';actions.append(cancel,done);form.append(actions);shell.append(header,form);modal.append(shell);document.body.append(modal);
       const finish=result=>{modal.remove();resolve(result);};cancel.onclick=close.onclick=()=>finish(null);modal.onclick=event=>{if(event.target===modal)finish(null);};form.onsubmit=event=>{event.preventDefault();if(form.reportValidity())finish(inputs.length?inputs.map(input=>input.value):true);};
     });
-  }
-  async function openShare(){
-    const shared=window.ReqlyShared;if(!shared?.enabled)return;
-    const modal=element('div','pages-modal open');modal.innerHTML='<section class="pages-dialog" role="dialog" aria-modal="true" aria-label="프로젝트 공유"><header><div><h2>프로젝트 공유</h2><p>같은 프로젝트를 열고 함께 검토할 수 있습니다.</p></div><button type="button" class="pages-close" aria-label="닫기">×</button></header><div class="pages-body"><label class="pages-field"><span>프로젝트 링크</span><input readonly data-share-url></label><p class="pages-note">링크와 사용자용 비밀번호를 함께 전달해 주세요. 비밀번호 변경은 프로젝트 설정에서 관리자만 할 수 있습니다.</p><p role="status" data-share-status></p><div class="pages-footer-actions"><button type="button" class="pages-action primary" data-copy>링크 복사</button><button type="button" class="pages-action" data-settings>프로젝트 설정</button></div></div></section>';
-    const url=modal.querySelector('[data-share-url]');url.value=shared.shareUrl();url.onclick=()=>url.select();modal.onclick=event=>{if(event.target===modal||event.target.closest('.pages-close'))modal.remove();};
-    modal.querySelector('[data-copy]').onclick=async()=>{try{await navigator.clipboard.writeText(url.value);modal.querySelector('[data-share-status]').textContent='링크를 복사했습니다.';}catch(_){url.select();modal.querySelector('[data-share-status]').textContent='링크를 선택했습니다. Ctrl+C로 복사해 주세요.';}};
-    modal.querySelector('[data-settings]').onclick=()=>{modal.remove();byId('projectButton').click();};document.body.append(modal);
   }
   // A single keyboard policy for all dialogs; the editor remains behind the active dialog.
   document.addEventListener('keydown',event=>{

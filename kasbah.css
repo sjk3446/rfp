@@ -208,11 +208,20 @@ body.editorial-app.kasbah-theme {
 .compact-shell .portrait-frame{position:relative;width:43px;height:43px;overflow:hidden;display:block;flex:none}
 .compact-shell .muhammad-portrait{position:absolute;width:56px;height:56px;max-width:none;left:-6px;top:-6px}
 .compact-shell .brand-wordmark{font:25px Georgia,serif;color:var(--kasbah-on)}
+.compact-shell .brand-identity{display:flex;flex-direction:column;min-width:0;max-width:230px;gap:2px}
+.compact-shell .brand-identity .brand-wordmark{line-height:24px}
+.compact-shell .topbar h1.workspace-project-name{display:block;margin:0;max-width:100%;font-family:inherit;font-size:14px;font-weight:600;line-height:17px;letter-spacing:0;color:var(--kasbah-gold,#d5b36b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:700px){.compact-shell .brand-identity{max-width:145px}.compact-shell .topbar h1.workspace-project-name{font-size:12px;line-height:16px}}
 body.compact-shell .topbar{flex-wrap:nowrap;gap:20px;min-height:60px}
 .compact-shell .heading-wrap{flex:0 0 auto;gap:0}
 .compact-shell .heading-wrap>div{display:none}
 .compact-shell .topbar .brand{gap:7px}
 .compact-shell .topbar .workspace-bar{flex:1;margin:0;padding:0;border:0;min-width:0;background:transparent}
+.compact-shell .topbar .workspace-bar:has(+.header-project){flex:0 1 auto}
+.compact-shell .header-project{flex:1;min-width:0;padding-left:16px;border-left:1px solid rgba(213,179,107,.35);line-height:1.2}
+.compact-shell .header-project-label{display:block;margin-bottom:3px;font-size:10px;color:var(--kasbah-gold,#d5b36b);opacity:.8}
+.compact-shell .header-project .workspace-project-name{font-size:15px;line-height:19px}
+@media(max-width:700px){.compact-shell .topbar .workspace-bar:has(+.header-project){flex-basis:auto;flex:0 1 auto}.compact-shell .header-project{order:3;flex:1;max-width:180px;padding-left:10px}.compact-shell .header-project-label{font-size:9px}.compact-shell .header-project .workspace-project-name{font-size:12px}}
 .compact-shell .workspace-bar::after,.compact-shell .workspace-progress{display:none}
 .compact-shell .workspace-bar .nav-list{gap:18px;justify-content:flex-start;max-width:none;flex-wrap:nowrap}
 .compact-shell .workspace-bar .nav-item{font-size:13px;white-space:nowrap;padding:8px 0}
@@ -231,7 +240,7 @@ body.compact-shell .topbar{flex-wrap:nowrap;gap:20px;min-height:60px}
 .compact-shell .classification-bar{padding:0 0 8px}
 .compact-shell .classification-bar .category-strip{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding:0 0 5px;gap:6px}
 .compact-shell .classification-bar .category-tab{flex:none;min-height:34px;padding:5px 9px;font-size:12px}
-.compact-shell .workbench{height:max(420px,calc(100dvh - var(--workbench-offset,170px) - 18px))}
+.compact-shell .workbench{height:max(420px,calc(100dvh - var(--workbench-offset,170px) - 32px))}
 .compact-shell .requirement-list-panel>.sort-wrap{padding:10px 14px;display:block}
 .compact-shell .filter-popover{background:var(--paper);padding:16px;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:10px}
 .compact-shell .filter-popover[hidden]{display:none}
@@ -289,3 +298,17 @@ body.editorial-app.kasbah-theme{background-image:linear-gradient(45deg,transpare
 .editorial-app.compact-shell .requirement-list-panel>.sort-wrap{flex:0 0 auto}
 @media(max-width:700px){.editorial-app.compact-shell .heading-wrap{flex:1}.editorial-app.compact-shell .top-actions{width:auto}.editorial-app.compact-shell .workspace-bar .nav-list{width:100%}}
 @media(max-width:700px){.editorial-app.compact-shell .workspace-tools{flex-wrap:wrap}.editorial-app.compact-shell .workspace-tools .search-box{flex:1 1 65%}}
+.editorial-app .ai-connection-modal .pages-dialog>header{padding:18px 28px}
+.editorial-app .ai-connection-modal .pages-body{padding:16px 28px 22px}
+.editorial-app .ai-connection-modal .ai-connection-status{margin:0 0 10px;padding:10px 14px}
+.editorial-app .ai-connection-modal .ui-form-intro{margin-bottom:12px}
+.editorial-app .ai-connection-modal .pages-field{margin:10px 0}
+.editorial-app .ai-connection-modal .pages-note{padding:8px 12px;margin:10px 0;line-height:1.6}
+.editorial-app .ai-connection-modal .pages-footer-actions{margin-top:14px;padding-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* Keep the mobile save bar on screen instead of forcing a 680px editor. */
+@media(max-width:700px){
+ .editorial-app.compact-shell .workbench{height:max(420px,calc(100dvh - var(--workbench-offset,260px) - 18px))}
+ .editorial-app.compact-shell .editor-open:not(.full-list) .workbench-editor{display:flex}
+ .editorial-app.compact-shell .drawer-header{padding-block:14px}
+}

@@ -1,0 +1,19 @@
+.requirement-ai-dialog{width:min(1120px,96vw)}
+.requirement-ai-dialog .pages-body{display:grid;gap:20px}
+.requirement-ai-tools{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
+.requirement-ai-tools .pages-field{flex:1;min-width:min(320px,100%);margin:0}
+.requirement-ai-state{border:1px solid var(--border,#d8cbb3);padding:20px;background:rgba(180,146,78,.07)}
+.requirement-ai-state h3{margin:0 0 12px;font-size:22px}
+.requirement-ai-state progress{width:100%;height:10px;accent-color:#94702d}
+.requirement-ai-state p{margin:8px 0;font-size:16px;line-height:1.7}
+.requirement-ai-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.requirement-ai-review{display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-bottom:1px solid #d8cbb3;padding-bottom:14px}
+.requirement-ai-review label,.requirement-ai-candidate>label{display:flex;align-items:flex-start;gap:12px;cursor:pointer}
+.requirement-ai-review input,.requirement-ai-candidate input{width:20px;height:20px;flex-shrink:0;accent-color:#0b4239}
+.requirement-ai-candidate{padding:20px 0;border-bottom:1px solid #d8cbb3}
+.requirement-ai-candidate strong{font-size:19px;line-height:1.6}
+.requirement-ai-candidate p{font-size:16px;line-height:1.7;margin:8px 0}
+.requirement-ai-candidate blockquote{white-space:pre-wrap;overflow-wrap:anywhere;margin:12px 0 0;padding:16px 20px;border-left:3px solid #b58c40;background:rgba(180,146,78,.06);font-size:17px;line-height:1.8}
+.requirement-ai-candidate.is-duplicate{opacity:.68}
+.requirement-ai-dialog [role=status]{white-space:pre-wrap;line-height:1.7}
+.requirement-ai-empty{padding:24px 0;line-height:1.8}

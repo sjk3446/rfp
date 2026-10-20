@@ -1,0 +1,22 @@
+.project-qa-dialog{width:min(980px,96vw)}
+.project-qa-dialog .pages-field textarea{width:100%;min-height:90px;padding:14px;font:inherit;line-height:1.7;resize:vertical}
+.qa-actions{display:flex;gap:10px;flex-wrap:wrap}
+.qa-scope,.qa-model,.qa-cost-note{font-size:14px;line-height:1.7;opacity:.8}
+.qa-question{font-weight:700;border-bottom:1px solid #d4c49e;padding-bottom:16px;margin-top:24px}
+.qa-claim{padding:16px 0;border-bottom:1px solid #d4c49e}
+.qa-claim>p{font-size:18px;line-height:1.8;white-space:pre-wrap}
+.qa-claim h4{font-size:15px;margin:16px 0 8px}
+.qa-claim .qa-citation-location{font-size:14px;margin:8px 0}
+.qa-claim blockquote{white-space:pre-wrap;overflow-wrap:anywhere;border-left:3px solid #b28a40;background:rgba(190,151,80,.08);padding:14px 18px;margin:10px 0;font-size:16px;line-height:1.8}
+.qa-follow-up{padding:16px;background:rgba(190,151,80,.1);line-height:1.8}
+.project-qa-dialog [role=status]{white-space:pre-wrap;line-height:1.7}
+.search-ai-button{flex-shrink:0;border:1px solid #aa873d;background:#a78a49;color:#092d26;font:inherit;font-size:13px;font-weight:750;padding:6px 10px;white-space:nowrap;cursor:pointer}
+.search-box:has(.search-ai-button) kbd{display:none}
+.qa-history{border-bottom:1px solid #c7b78f;padding-bottom:16px;margin-bottom:20px}
+.qa-history summary{font-weight:700;cursor:pointer;padding:8px 0}
+.qa-history>input{width:100%;padding:10px;font:inherit;margin:10px 0}
+.qa-history-item{display:block;width:100%;border:0;border-bottom:1px solid #d9ccb1;background:transparent;text-align:left;color:inherit;padding:12px 0;cursor:pointer}
+.qa-history-item strong,.qa-history-item small{display:block;line-height:1.6;overflow-wrap:anywhere}
+.qa-history-item small{margin-top:4px;opacity:.7}
+.qa-history-row{display:flex;gap:12px;align-items:center}.qa-history-row>input{width:18px;height:18px;flex-shrink:0;accent-color:#185c4b}.qa-history-row .qa-history-item{min-width:0;flex:1}
+.qa-visibility-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0}.qa-visibility-tools>span{margin-right:auto;font-size:14px}

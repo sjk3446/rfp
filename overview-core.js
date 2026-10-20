@@ -53,7 +53,7 @@
     }
     return left.length&&right.length?[left,right]:null;
   }
-  async function analyze(data,{request,shouldStop=()=>false,onEvent=()=>{}}){
+  async function analyze(data,{request,validateResult=validate,shouldStop=()=>false,onEvent=()=>{}}){
     data.depths ||= data.batches.map(()=>0);
     for(let index=0;index<data.batches.length;){
       if(shouldStop())throw new Error('분석을 중단했습니다. 완료된 구간은 유지되며 이어서 분석할 수 있습니다.');
@@ -61,7 +61,7 @@
       onEvent({type:'request',index});
       try{
         const response=await request(data.batches[index]);
-        data.results[index]=validate(response,data.batches[index]);
+        data.results[index]=validateResult(response,data.batches[index]);
         onEvent({type:'completed',index});index++;
       }catch(error){
         const retryable=['OUTPUT_LIMIT','CONTEXT_LIMIT','INVALID_JSON','AI_TIMEOUT'].includes(error.code);
