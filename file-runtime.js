@@ -148,7 +148,7 @@
     let kind='rfp';const input=modal.querySelector('[data-input]');for(const type of ['rfp','reference'])modal.querySelector(`[data-${type}]`).onclick=()=>{if(working)return;kind=type;input.click();};
     input.onchange=async()=>{await run(modal.querySelector(`[data-${kind}]`),async()=>{const files=Array.from(input.files);for(const file of files)await add(file,kind);if(kind==='reference')await window.ReqlyApp.addReferences(files);notice(kind==='rfp'?'RFP를 추가했습니다. 아래에서 기본 지정 또는 요구사항 추출을 선택해 주세요.':'관련자료를 추가했습니다.');});input.value='';};
     settingsPanel.querySelector('[data-share]').onclick=()=>navigator.clipboard.writeText(window.ReqlyShared.shareUrl()).then(()=>settingsNotice('공유 URL을 복사했습니다. 사용자용 비밀번호를 함께 전달해 주세요.')).catch(()=>settingsNotice(window.ReqlyShared.shareUrl()));
-    settingsPanel.querySelector('[data-new]').onclick=()=>{const url=new URL(location.href);url.searchParams.delete('project');url.searchParams.set('mode','shared');navigateProject(url.href);};
+    settingsPanel.querySelector('[data-new]').onclick=()=>{const url=new URL(location.href);url.searchParams.delete('project');url.searchParams.set('mode','shared');url.searchParams.set('new','1');navigateProject(url.href);};
     settingsPanel.querySelector('[data-open-shared-form]').onsubmit=event=>{
       event.preventDefault();
       try{const id=window.ReqlyProjectDirectory.idFromUrl(settingsPanel.querySelector('[data-open-shared-url]').value);navigateProject(window.ReqlyProjectDirectory.projectUrl(location.href,id));}

@@ -338,6 +338,11 @@ html:has(body.editorial-app) { min-width:0; }
 .editorial-app .shared-project-row button { flex-shrink:0; }
 .editorial-app .shared-project-link { display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-top:20px; }
 .editorial-app .pages-modal .shared-project-link .pages-field { flex:1 1 220px;min-width:0;margin:0; }
+.editorial-app .project-picker-search { width:100%;padding:12px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);font:inherit; }
+.editorial-app .project-picker .shared-project-row h3 { margin:0 0 6px;font-size:18px;overflow-wrap:anywhere; }
+.editorial-app .project-picker .ui-form-intro { margin:20px 0; }
+.editorial-app .project-picker-footer { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:24px;padding-top:20px; }
+.editorial-app .project-picker-footer span { font-size:14px;color:var(--muted); }
 .editorial-app .ui-confirm-copy { white-space:pre-wrap;font-size:15px;line-height:1.9; }
 .editorial-app .ui-form-heading { margin-bottom:5px; }
 .editorial-app .ui-form-intro { margin:0 0 24px;font-size:13px;color:var(--muted);line-height:1.8; }

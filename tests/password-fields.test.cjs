@@ -48,5 +48,5 @@ test('password changes validate the new password pair and cancel clears revealed
 test('project creation renders both confirmation fields before any server request',async()=>{
   const c=formClient(),pending=c.api.create(),inputs=c.inputs();
   assert.equal(inputs.length,5);assert.equal(inputs[1].autocomplete,'new-password');assert.equal(inputs[4].autocomplete,'new-password');
-  c.nodes.find(node=>node.tag==='button'&&node.textContent==='취소').onclick();await assert.rejects(pending,/취소/);
+  c.nodes.find(node=>node.tag==='button'&&node.textContent==='프로젝트 목록으로').onclick();assert.equal(await pending,null);
 });

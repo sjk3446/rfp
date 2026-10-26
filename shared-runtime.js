@@ -13,13 +13,13 @@
   let directoryStorage;try{directoryStorage=window.localStorage;}catch(_){}
   const directory=window.ReqlyProjectDirectory?.create(directoryStorage);
   const clone = value => JSON.parse(JSON.stringify(value));
-  function fields(title, labels){
+  function fields(title, labels, options={}){
     return new Promise(resolve=>{
       const modal=document.createElement('div');modal.className='pages-modal open';
       const dialog=document.createElement('section');dialog.className='pages-dialog';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
       const body=document.createElement('form');body.className='pages-body';const heading=document.createElement('h2');heading.textContent=title;heading.id=`form-${crypto.randomUUID()}`;dialog.setAttribute('aria-labelledby',heading.id);body.append(heading);
       if(title==='새 프로젝트')body.className+=' credential-form';
-      const intro=document.createElement('p');intro.className='ui-form-intro';intro.textContent=title==='새 프로젝트'?'관리자용과 사용자용 비밀번호를 각각 설정해 주세요. 관리자만 비밀번호를 변경할 수 있습니다.':title==='비밀번호 변경'?'변경할 비밀번호를 선택하고 새 비밀번호를 두 번 입력해 주세요.':'프로젝트 비밀번호를 입력하면 문서와 검토 내용을 열 수 있습니다.';body.append(intro);
+      const intro=document.createElement('p');intro.className='ui-form-intro';intro.textContent=options.description||(title==='새 프로젝트'?'관리자용과 사용자용 비밀번호를 각각 설정해 주세요. 관리자만 비밀번호를 변경할 수 있습니다.':title==='비밀번호 변경'?'변경할 비밀번호를 선택하고 새 비밀번호를 두 번 입력해 주세요.':'프로젝트 비밀번호를 입력하면 문서와 검토 내용을 열 수 있습니다.');body.append(intro);
       const error=document.createElement('p');error.id=`error-${crypto.randomUUID()}`;error.setAttribute('role','alert');error.style.color='#b42335';error.hidden=true;let attempted=false;
       const inputs=labels.map(({label,password,options,autocomplete})=>{
         const wrap=document.createElement('div');wrap.className='pages-field';
@@ -49,6 +49,7 @@
       body.append(error);
       const done=document.createElement('button');done.type='submit';done.className='pages-action primary';done.textContent=title==='새 프로젝트'?'프로젝트 만들기':title==='비밀번호 변경'?'비밀번호 변경':title==='프로젝트 접속'?'프로젝트 열기':'확인';const cancel=document.createElement('button');cancel.type='button';cancel.className='pages-action';cancel.textContent='취소';cancel.setAttribute('data-dialog-cancel','');const actions=document.createElement('div');actions.className='ui-dialog-actions';actions.append(cancel,done);body.append(actions);dialog.append(body);modal.append(dialog);document.body.append(modal);
       const finish=value=>{inputs.forEach((input,index)=>{input.value='';if(labels[index].password)input.type='password';});modal.remove();resolve(value);};
+      if(options.cancel)cancel.textContent=options.cancel;
       body.onsubmit=event=>{event.preventDefault();attempted=true;const invalid=validate();if(invalid){invalid.focus();return;}finish(inputs.map(input=>input.value));};cancel.onclick=()=>finish(null);
     });
   }
@@ -65,8 +66,8 @@
       if(url.origin!=='https://script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(url.pathname))throw new Error('Google 웹 앱 주소가 올바르지 않습니다.');
       url.searchParams.set('channel',nonce);
       const frame=document.createElement('iframe');frame.hidden=true;frame.src=url.href;
-      const timeout=setTimeout(()=>reject(new Error('저장소 연결을 확인해 주세요.')),60000);
-      window.addEventListener('message',event=>{
+      const timeout=setTimeout(()=>{window.removeEventListener?.('message',onMessage);frame.remove();reject(new Error('저장소 연결을 확인해 주세요.'));},60000);
+      const onMessage=event=>{
         const message=event.data;
         if(!message||message.channel!=='reqly-drive-v1'||message.nonce!==nonce)return;
         if(!/^https:\/\/(?:[a-z0-9-]+-)?script\.googleusercontent\.com$/.test(event.origin))return;
@@ -76,9 +77,10 @@
         pending.delete(message.requestId);clearTimeout(job.timeout);
         if(message.result?.ok)job.resolve(message.result.value);
         else {const error=new Error(message.result?.error||'저장하지 못했습니다.');error.code=message.result?.code;job.reject(error);}
-      });
+      };
+      window.addEventListener('message',onMessage);
       document.body.appendChild(frame);
-    });
+    }).catch(error=>{ready=undefined;throw error;});
     return ready;
   }
   async function rpc(action, body={}) {
@@ -110,19 +112,33 @@
     enabled:useShared,
     get project(){return project;}, get role(){return role;},
     async start(){
-      await connect();
       const id=new URL(location.href).searchParams.get('project');
-      if(id){
-        const challenge=await rpc('challenge',{id});
-        let result;
-        while(!result){const entry=await fields('프로젝트 접속',[{label:'프로젝트 비밀번호',password:true}]);if(entry===null)throw new Error('프로젝트 접속을 취소했습니다.');const password=entry[0];
-          try{result=await rpc('login',{id,proof:await proof(password,challenge.salt)});}catch(error){if(error.code!=='AUTH')throw error;if(window.ReqlyDesign)await window.ReqlyDesign.notice('프로젝트 접속',error.message);else alert(error.message);}}
-        accept(result);
-      }else await this.create();
+      let selection=id?{id,name:directory?.list().find(item=>item.id===id)?.name||''}:new URL(location.href).searchParams.get('new')==='1'?{create:true}:null,message='';
+      while(!project){
+        // Base URL always opens the list. Creation requires its explicit button.
+        selection ||= await window.ReqlyProjectPicker.choose({projects:this.knownProjects(),message});message='';
+        try{
+          if(selection.create){await this.create();}
+          else{
+            let result;
+            while(!result){
+              const entry=await fields('프로젝트 접속',[{label:'프로젝트 비밀번호',password:true}],{description:message||(selection.name?`‘${selection.name}’ 프로젝트의 비밀번호를 입력해 주세요.`:'선택한 프로젝트의 비밀번호를 입력해 주세요.'),cancel:'프로젝트 목록으로'});
+              if(entry===null){message='';break;}
+              try{const challenge=await rpc('challenge',{id:selection.id});result=await rpc('login',{id:selection.id,proof:await proof(entry[0],challenge.salt)});}
+              catch(error){if(error.code!=='AUTH')throw error;message=error.message;}
+            }
+            if(result)accept(result);
+          }
+        }catch(error){message=error.message||'프로젝트를 열지 못했습니다. 다시 선택해 주세요.';}
+        selection=null;
+        const url=new URL(location.href);url.searchParams.delete('project');url.searchParams.delete('new');
+        if(project)url.searchParams.set('project',project.id);
+        history.replaceState(null,'',url);
+      }
       timer=setInterval(poll,10000);return{workspace:clone(project.workspace)};
     },
     async create(){
-      const entry=await fields('새 프로젝트',[{label:'프로젝트 이름'},{label:'관리자용 비밀번호',password:true,autocomplete:'new-password'},{label:'관리자용 비밀번호 확인',password:true,autocomplete:'new-password',mustMatch:1},{label:'사용자용 비밀번호',password:true,autocomplete:'new-password',differentFrom:1},{label:'사용자용 비밀번호 확인',password:true,autocomplete:'new-password',mustMatch:3}]);if(!entry)throw new Error('취소했습니다.');
+      const entry=await fields('새 프로젝트',[{label:'프로젝트 이름'},{label:'관리자용 비밀번호',password:true,autocomplete:'new-password'},{label:'관리자용 비밀번호 확인',password:true,autocomplete:'new-password',mustMatch:1},{label:'사용자용 비밀번호',password:true,autocomplete:'new-password',differentFrom:1},{label:'사용자용 비밀번호 확인',password:true,autocomplete:'new-password',mustMatch:3}],{cancel:'프로젝트 목록으로'});if(!entry)return null;
       const [name,admin,,user]=entry;
       if(admin===user)throw new Error('두 비밀번호는 서로 달라야 합니다.');
       const salt=hex(crypto.getRandomValues(new Uint8Array(32)));

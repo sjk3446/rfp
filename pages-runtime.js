@@ -7,7 +7,7 @@
   const STORE = 'projects';
   const ACTIVE_KEY = 'reqly-active-project';
   const HELPER_URL = 'http://127.0.0.1:8766';
-  const MAX_PROJECTS = 3;
+  const MAX_PROJECTS = 10;
   let database;
   let saveTimer;
   let currentProject = null;
@@ -134,7 +134,7 @@
   }
 
   function installProjectUi() {
-    const modal = modalShell('projectModal', '프로젝트 관리', '프로젝트는 이 브라우저에 최대 3개까지 저장됩니다.', `
+    const modal = modalShell('projectModal', '프로젝트 관리', `프로젝트는 이 브라우저에 최대 ${MAX_PROJECTS}개까지 저장됩니다.`, `
       <p class="pages-note">브라우저 데이터 삭제 또는 기기 변경에 대비해 중요한 프로젝트는 JSON 백업을 내려받아 보관하세요. 다른 브라우저와 자동 동기화되지는 않습니다.</p>
       <div data-project-list></div><div class="pages-footer-actions"><button class="pages-action primary" data-new-project>새 프로젝트</button><button class="pages-action" data-import-project>백업 가져오기</button><span data-project-limit></span></div><input class="pages-hidden-input" data-import-input type="file" accept=".json,application/json">
     `);
@@ -178,7 +178,7 @@
         const payload = JSON.parse(await event.target.files[0].text());
         if (payload.format !== 'reqly-pages-project' || !payload.project?.workspace) throw new Error('Muhammad 프로젝트 백업 파일이 아닙니다.');
         const projects = await dbAll();
-        if (projects.length >= MAX_PROJECTS) throw new Error('프로젝트 3개를 사용 중입니다. 하나를 삭제한 뒤 가져오세요.');
+        if (projects.length >= MAX_PROJECTS) throw new Error(`프로젝트 ${MAX_PROJECTS}개를 사용 중입니다. 하나를 삭제한 뒤 가져오세요.`);
         const id = uid();
         const imported = {...payload.project,id,name:`${payload.project.name} (가져옴)`,updatedAt:now(),workspace:{...payload.project.workspace,projectId:id}};
         await dbPut(imported); localStorage.setItem(ACTIVE_KEY,id); location.reload();
