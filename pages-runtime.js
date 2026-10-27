@@ -120,7 +120,7 @@
     const modal = document.createElement('div');
     modal.className = 'pages-modal'; modal.id = id;
     modal.innerHTML = `<section class="pages-dialog" role="dialog" aria-modal="true"><header><div><h2>${title}</h2><p>${intro}</p></div><button class="pages-close" type="button" aria-label="닫기">×</button></header><div class="pages-body">${body}</div></section>`;
-    modal.addEventListener('click', event => { if (event.target === modal || event.target.closest('.pages-close')) modal.classList.remove('open'); });
+    modal.addEventListener('click', event => { if (event.target.closest('.pages-close')) modal.classList.remove('open'); });
     document.body.appendChild(modal);
     return modal;
   }

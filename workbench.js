@@ -176,7 +176,7 @@
       const feedback=element('p','ui-save-feedback');feedback.setAttribute('role','status');feedback.hidden=true;
       const actions=element('div','ui-dialog-actions'),cancel=button('취소','pages-action'),done=button(confirm,save?'pages-action':'pages-action primary');done.type='submit';if(danger)done.style.background='var(--danger)';actions.append(cancel,done);form.append(feedback,actions);shell.append(header,form);modal.append(shell);document.body.append(modal);
       let busy=false;
-      const finish=result=>{if(busy)return;modal.remove();resolve(result);};cancel.onclick=close.onclick=()=>finish(null);modal.onclick=event=>{if(event.target===modal)finish(null);};form.onsubmit=event=>{event.preventDefault();if(form.reportValidity())finish(inputs.length?inputs.map(input=>input.value):true);};
+      const finish=result=>{if(busy)return;modal.remove();resolve(result);};cancel.onclick=close.onclick=()=>finish(null);form.onsubmit=event=>{event.preventDefault();if(form.reportValidity())finish(inputs.length?inputs.map(input=>input.value):true);};
       if(save){
         const saveButton=button('저장하고 이동','pages-action primary');actions.append(saveButton);
         saveButton.onclick=async()=>{
@@ -195,8 +195,8 @@
   document.addEventListener('keydown',event=>{
     const modal=topModal();if(!modal)return;
     if(event.key==='Escape'){
-      event.preventDefault();event.stopImmediatePropagation();if(modal.getAttribute('aria-busy')==='true')return;
-      const close=modal.querySelector('.pages-close');if(close)close.click();else modal.querySelector('[data-dialog-cancel],.ui-dialog-actions button')?.click();
+      // Dismiss only through an explicit close/action button, never Escape.
+      event.preventDefault();event.stopImmediatePropagation();
     }else if(event.key==='Tab'){
       const targets=focusables(modal),first=targets[0],last=targets.at(-1);if(!first)return;
       if(event.shiftKey&&(document.activeElement===first||!modal.contains(document.activeElement))){event.preventDefault();last.focus();}

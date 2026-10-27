@@ -1514,7 +1514,6 @@ function bindEvents() {
   elements.referenceInput.addEventListener('change', event => event.target.files.length && analyzeReferenceFiles(event.target.files));
   elements.addButton.addEventListener('click', () => openDrawer());
   elements.drawerClose.addEventListener('click', () => closeDrawer());
-  elements.drawerBackdrop.addEventListener('click', () => closeDrawer());
   elements.cancelButton.addEventListener('click', () => closeDrawer());
   elements.requirementForm.addEventListener('submit', saveRequirement);
   elements.deleteButton.addEventListener('click', () => deleteRequirement());
@@ -1641,14 +1640,14 @@ function bindEvents() {
   elements.exportButton.addEventListener('click', event => { event.stopPropagation(); elements.exportMenu.classList.toggle('open'); });
   elements.qaExportButton.addEventListener('click', exportQuestionWorkbook);
   elements.exportMenu.addEventListener('click', event => { const button = event.target.closest('[data-export]'); if (button) exportRequirements(button.dataset.export); });
-  document.addEventListener('click', event => { if (!event.target.closest('.export-wrap')) elements.exportMenu.classList.remove('open'); });
+  const exportClose=document.createElement('button');exportClose.type='button';exportClose.className='pages-close';exportClose.textContent='×';exportClose.setAttribute('aria-label','내보내기 메뉴 닫기');exportClose.onclick=()=>elements.exportMenu.classList.remove('open');elements.exportMenu.prepend(exportClose);
   elements.clearProject?.addEventListener('click', () => {
     if (!window.confirm('현재 문서와 요구사항을 모두 초기화할까요?')) return;
     state.document = null; state.references = []; state.requirements = []; state.selected.clear(); resetFilters(false); saveWorkspace(); render();
     showToast('프로젝트를 초기화했습니다', '새 RFP 문서를 업로드할 수 있습니다.');
   });
   elements.menuButton.addEventListener('click', () => { elements.sidebar.classList.add('open'); elements.mobileScrim.classList.add('open'); });
-  elements.mobileScrim.addEventListener('click', () => { elements.sidebar.classList.remove('open'); elements.mobileScrim.classList.remove('open'); });
+  const sidebarClose=document.createElement('button');sidebarClose.type='button';sidebarClose.className='pages-close mobile-sidebar-close';sidebarClose.textContent='×';sidebarClose.setAttribute('aria-label','메뉴 닫기');sidebarClose.onclick=()=>{elements.sidebar.classList.remove('open');elements.mobileScrim.classList.remove('open');};elements.sidebar.prepend(sidebarClose);
   document.querySelectorAll('.nav-item').forEach(button => button.addEventListener('click', () => {
     document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item === button));
     const view = button.dataset.view;
@@ -1665,9 +1664,6 @@ function bindEvents() {
   });
   document.addEventListener('keydown', event => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); elements.searchInput.focus(); }
-    if (event.key === 'Escape') {
-      closeDrawer();
-    }
   });
 }
 
@@ -1692,9 +1688,10 @@ async function init() {
     if(state.requirements.length&&matchMedia('(min-width:701px)').matches)await openDrawer(state.requirements[0].key,true);
   } catch (error) {
     console.error(error);
+    window.ReqlyShared?.finishLoading();
     if(window.ReqlyDesign)await window.ReqlyDesign.notice('프로젝트를 열지 못했습니다',error.message);
     else window.alert(`앱을 시작하지 못했습니다: ${error.message}`);
-  }
+  } finally { window.ReqlyShared?.finishLoading(); }
 }
 
 document.addEventListener('DOMContentLoaded', init);

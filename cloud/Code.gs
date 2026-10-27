@@ -15,7 +15,7 @@ function doGet(e) {
 
 function reqlyRpc(request) {
   try {
-    const actions = ['challenge', 'create', 'login', 'load', 'save', 'password', 'upload', 'download', 'removeFile', 'selectRfp'];
+    const actions = ['challenge', 'create', 'login', 'load', 'save', 'password', 'upload', 'download', 'removeFile', 'selectRfp', 'deleteProject'];
     if (!request || !actions.includes(request.action)) throw new Error('지원하지 않는 요청입니다.');
     const lock = LockService.getScriptLock();
     lock.waitLock(25000);
@@ -66,6 +66,7 @@ function record_(id) {
   const folders = settings_().root.getFoldersByName(id);
   if (!folders.hasNext()) fail_('NOT_FOUND', '프로젝트를 찾을 수 없습니다.');
   const folder = folders.next(), files = folder.getFilesByName('project.json');
+  if (folder.isTrashed()) fail_('NOT_FOUND', '삭제되었거나 찾을 수 없는 프로젝트입니다.');
   if (!files.hasNext()) fail_('NOT_FOUND', '프로젝트를 찾을 수 없습니다.');
   const file = files.next();
   return { folder: folder, file: file, data: JSON.parse(file.getBlob().getDataAsString('UTF-8')) };
@@ -98,6 +99,20 @@ function public_(data) {
     workspace: { projectId: data.id, document: data.document, references: data.references, requirements: Object.values(data.items), assets: data.assets.map(file=>{const value=Object.assign({},file);delete value.driveId;return value;}), selectedRfp: data.selectedRfp } };
 }
 
+function loginRole_(record, proof) {
+  const data = record.data;
+  if (data.failures.until > Date.now()) fail_('RATE_LIMIT', '잠시 후 다시 접속해 주세요.');
+  const hash = mac_(proof_(proof));
+  const role = equal_(hash, data.auth.admin.hash) ? 'admin' : equal_(hash, data.auth.user.hash) ? 'user' : '';
+  if (!role) {
+    data.failures.count += 1;
+    if (data.failures.count >= 20) data.failures = { count: 0, until: Date.now() + 60000 };
+    write_(record); fail_('AUTH', '비밀번호가 올바르지 않습니다.');
+  }
+  data.failures = { count: 0, until: 0 }; write_(record);
+  return role;
+}
+
 function dispatch_(r) {
   if (r.action === 'create') {
     if (!String(r.name || '').trim()) throw new Error('프로젝트 이름을 입력해 주세요.');
@@ -114,16 +129,16 @@ function dispatch_(r) {
   const record = record_(r.id), data = record.data;
   if (r.action === 'challenge') return { salt: data.auth.admin.salt, iterations: 600000 };
   if (r.action === 'login') {
-    if (data.failures.until > Date.now()) fail_('RATE_LIMIT', '잠시 후 다시 접속해 주세요.');
-    const hash = mac_(proof_(r.proof));
-    const role = equal_(hash, data.auth.admin.hash) ? 'admin' : equal_(hash, data.auth.user.hash) ? 'user' : '';
-    if (!role) {
-      data.failures.count += 1;
-      if (data.failures.count >= 20) data.failures = { count: 0, until: Date.now() + 60000 };
-      write_(record); fail_('AUTH', '비밀번호가 올바르지 않습니다.');
-    }
-    data.failures = { count: 0, until: 0 }; write_(record);
+    const role = loginRole_(record, r.proof);
     return { project: public_(data), role: role, token: token_(data, role) };
+  }
+  if (r.action === 'deleteProject') {
+    // Require fresh administrator proof even if the caller has an existing token.
+    if (loginRole_(record, r.proof) !== 'admin') fail_('FORBIDDEN', '프로젝트 삭제는 관리자용 비밀번호로만 가능합니다.');
+    if (r.confirmName !== data.name) fail_('CONFIRM', '삭제할 프로젝트 이름을 정확히 입력해 주세요.');
+    // Preserve project.json and attachments together for the Drive owner's recovery.
+    record.folder.setTrashed(true);
+    return { deleted: true, id: data.id };
   }
   const role = authorize_(record, r.token, ['password', 'removeFile'].includes(r.action));
   if (r.action === 'load') {

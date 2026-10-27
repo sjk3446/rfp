@@ -8,7 +8,7 @@ function backend(activeUser='owner@example.test'){
   const folders=new Map(), files=new Map(), properties=new Map();let seq=0;
   const blob=(value)=>({getDataAsString:()=>Buffer.from(value).toString('utf8'),getBytes:()=>Array.from(Buffer.from(value))});
   const iterator=values=>{let index=0;return{hasNext:()=>index<values.length,next:()=>values[index++]};};
-  function folder(name){const id=`folder-${++seq}`,children=[],entries=[];const result={getId:()=>id,createFolder:name=>{const child=folder(name);children.push({name,child});return child;},getFoldersByName:name=>iterator(children.filter(x=>x.name===name).map(x=>x.child)),getFilesByName:name=>iterator(entries.filter(x=>x.name===name&&!x.trash)),createFile:(name,content)=>{
+  function folder(name){const id=`folder-${++seq}`,children=[],entries=[];let trashed=false;const result={getId:()=>id,isTrashed:()=>trashed,setTrashed:value=>{trashed=value;},createFolder:name=>{const child=folder(name);children.push({name,child});return child;},getFoldersByName:name=>iterator(children.filter(x=>x.name===name).map(x=>x.child)),getFilesByName:name=>iterator(entries.filter(x=>x.name===name&&!x.trash)),createFile:(name,content)=>{
     if(typeof name!=='string'){content=name.getBytes();name=name.name;}
     const id=`file-${++seq}`;const entry={name,trash:false,getId:()=>id,getBlob:()=>blob(content),setContent:value=>{content=value;},setTrashed:value=>{entry.trash=value;}};entries.push(entry);files.set(id,entry);return entry;
   }};folders.set(id,result);return result;}
@@ -17,10 +17,37 @@ function backend(activeUser='owner@example.test'){
   vm.runInContext(fs.readFileSync(require.resolve('../cloud/Code.gs'),'utf8'),ctx);ctx.setup_();
   const rpc=request=>JSON.parse(JSON.stringify(ctx.reqlyRpc(request)));
   const create=()=>rpc({action:'create',name:'Test',admin:{salt:'a'.repeat(64),proof:'1'.repeat(64)},user:{salt:'a'.repeat(64),proof:'2'.repeat(64)}}).value;
-  return{rpc,create,initialize:()=>ctx.initializeStorage()};
+  return{rpc,create,initialize:()=>ctx.initializeStorage(),folderFor:id=>[...folders.values()].find(folder=>folder.getFoldersByName(id).hasNext())?.getFoldersByName(id).next()};
 }
 test('only the script owner may initialize storage',()=>{assert.equal(backend().initialize().ready,true);assert.throws(()=>backend('').initialize(),/소유자/);assert.throws(()=>backend('other@example.test').initialize(),/소유자/);});
 test('create returns project-scoped administrator token and no password hashes',()=>{const{create}=backend(),p=create();assert.equal(p.role,'admin');assert.equal(p.project.workspace.requirements.length,0);assert.equal(JSON.stringify(p.project).includes('auth'),false);});
+
+test('project deletion requires fresh administrator proof and exact name, not just a token',()=>{
+  const {rpc,create,folderFor}=backend(),p=create(),id=p.project.id;
+  for(const [proof,confirmName,code]of [['3'.repeat(64),'Test','AUTH'],['2'.repeat(64),'Test','FORBIDDEN'],['1'.repeat(64),'wrong','CONFIRM']]){
+    assert.equal(rpc({action:'deleteProject',id,token:p.token,proof,confirmName}).code,code);assert.equal(folderFor(id).isTrashed(),false);
+  }
+  assert.equal(rpc({action:'deleteProject',id,token:p.token,confirmName:'Test'}).ok,false);
+  assert.equal(rpc({action:'load',id,token:p.token}).ok,true);
+});
+
+test('deletion trashes only selected project; old sessions fail and restoring retains all content',()=>{
+  const {rpc,create,folderFor}=backend(),a=create(),b=create(),auth={id:a.project.id,token:a.token};
+  rpc({action:'save',...auth,changes:[{key:'r1',expectedRevision:0,item:{key:'r1',description:'keep',questions:[{question:'keep question'}]}}]});
+  const upload=rpc({action:'upload',...auth,kind:'rfp',name:'original.pdf',base64:'YQ=='}).value.project;
+  assert.deepEqual(rpc({action:'deleteProject',id:a.project.id,proof:'1'.repeat(64),confirmName:'Test'}).value,{deleted:true,id:a.project.id});
+  assert.equal(rpc({action:'load',...auth}).code,'NOT_FOUND');assert.equal(rpc({action:'challenge',id:a.project.id}).code,'NOT_FOUND');
+  assert.equal(rpc({action:'load',id:b.project.id,token:b.token}).ok,true);
+  folderFor(a.project.id).setTrashed(false);
+  assert.deepEqual(rpc({action:'load',...auth}).value.project,upload);
+  assert.equal(rpc({action:'download',...auth,assetId:upload.workspace.assets[0].id}).value.base64,'YQ==');
+});
+
+test('repeated incorrect delete passwords are rate limited without deleting any data',()=>{
+  const {rpc,create,folderFor}=backend(),p=create(),id=p.project.id;
+  for(let i=0;i<20;i++)assert.equal(rpc({action:'deleteProject',id,proof:'3'.repeat(64),confirmName:'Test'}).code,'AUTH');
+  assert.equal(rpc({action:'deleteProject',id,proof:'1'.repeat(64),confirmName:'Test'}).code,'RATE_LIMIT');assert.equal(folderFor(id).isTrashed(),false);
+});
 test('user login cannot change passwords or delete files',()=>{const{rpc,create}=backend(),p=create(),id=p.project.id;const u=rpc({action:'login',id,proof:'2'.repeat(64)}).value;for(const action of ['password','removeFile'])assert.equal(rpc({action,id,token:u.token}).code,'FORBIDDEN');});
 test('token cannot access a different project or be forged',()=>{const{rpc,create}=backend(),a=create(),b=create();assert.equal(rpc({action:'load',id:b.project.id,token:a.token}).code,'AUTH');assert.equal(rpc({action:'load',id:a.project.id,token:a.token+'x'}).code,'AUTH');});
 test('same-item stale save rejected and different-item saves preserved',()=>{const{rpc,create}=backend(),p=create(),auth={id:p.project.id,token:p.token};const change=(key,name,revision)=>({key,expectedRevision:revision,item:{key,id:key,name}});assert.equal(rpc({action:'save',...auth,changes:[change('req-a','first',0)]}).ok,true);assert.equal(rpc({action:'save',...auth,changes:[change('req-a','stale',0)]}).code,'CONFLICT');assert.equal(rpc({action:'save',...auth,changes:[change('req-b','other',0)]}).ok,true);const items=rpc({action:'load',...auth}).value.project.workspace.requirements;assert.equal(items.length,2);assert.equal(items.find(x=>x.key==='req-a').name,'first');assert.ok(items[0].savedAt);});

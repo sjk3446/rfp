@@ -57,9 +57,15 @@
       const current=shared()&&project.id===window.ReqlyShared.project.id;
       const date=new Date(project.updatedAt),stamp=Number.isNaN(date.getTime())?'마지막 저장일 확인 전':`마지막 확인한 저장: ${date.toLocaleString('ko-KR')}`;
       info.append(name,node('p',stamp));row.append(info);
-      const open=node('button',current?'현재 프로젝트':'열기',`fm-action${current?'':' fm-action-primary'}`);open.type='button';open.disabled=current;
-      open.onclick=()=>navigateProject(window.ReqlyProjectDirectory.projectUrl(location.href,project.id));
-      row.append(open);area.append(row);
+      const actions=window.ReqlyProjectPicker.actions(project,{current,onOpen:()=>navigateProject(window.ReqlyProjectDirectory.projectUrl(location.href,project.id)),onDelete:async()=>{
+        try{
+          if(current&&window.ReqlyApp?.confirmLeave&&!(await window.ReqlyApp.confirmLeave()))return;
+          if(!(await window.ReqlyShared.deleteProject(project)))return;
+          if(current){const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('mode','shared');window.ReqlyApp?.allowNavigation?.();location.href=url.href;}
+          else{renderProjectList();settingsNotice(`‘${project.name}’ 프로젝트를 삭제했습니다.`);}
+        }catch(error){settingsNotice(error.message);}
+      }});
+      row.append(actions);area.append(row);
     }
   }
   function renderSettings(){
@@ -130,10 +136,10 @@
     // Sharing/passwords belong exclusively to Project; the cabinet keeps documents only.
     settingsPanel=modal.querySelector('#fm-settings');settingsPanel.hidden=false;settingsPanel.removeAttribute('role');settingsPanel.removeAttribute('aria-labelledby');settingsPanel.removeAttribute('data-file-panel');
     settingsModal=document.getElementById('projectModal');
-    if(!settingsModal){settingsModal=node('div',undefined,'pages-modal fm-modal');settingsModal.id='projectSettingsModal';settingsModal.innerHTML='<section class="pages-dialog" role="dialog" aria-modal="true" aria-label="프로젝트 설정"><header><div><h2>프로젝트</h2><p>프로젝트 목록 · 공유 · 비밀번호</p></div><button class="pages-close" type="button" aria-label="프로젝트 설정 닫기">×</button></header><div class="pages-body"></div></section>';document.body.append(settingsModal);settingsModal.onclick=event=>{if(event.target===settingsModal||event.target.closest('.pages-close'))settingsModal.classList.remove('open');};}
+    if(!settingsModal){settingsModal=node('div',undefined,'pages-modal fm-modal');settingsModal.id='projectSettingsModal';settingsModal.innerHTML='<section class="pages-dialog" role="dialog" aria-modal="true" aria-label="프로젝트 설정"><header><div><h2>프로젝트</h2><p>프로젝트 목록 · 공유 · 비밀번호</p></div><button class="pages-close" type="button" aria-label="프로젝트 설정 닫기">×</button></header><div class="pages-body"></div></section>';document.body.append(settingsModal);settingsModal.onclick=event=>{if(event.target.closest('.pages-close'))settingsModal.classList.remove('open');};}
     const settingsMessage=node('p',undefined,'fm-notice');settingsMessage.dataset.settingsMessage='';settingsMessage.setAttribute('role','status');settingsModal.querySelector('.pages-body').prepend(settingsMessage,settingsPanel);
     modal.querySelector('.fm-tabs').remove();const documentsPanel=modal.querySelector('#fm-documents');documentsPanel.removeAttribute('role');documentsPanel.removeAttribute('aria-labelledby');
-    modal.onclick=event=>{if(!working&&(event.target===modal||event.target.closest('.pages-close')))modal.classList.remove('open');};
+    modal.onclick=event=>{if(!working&&event.target.closest('.pages-close'))modal.classList.remove('open');};
     const button=document.createElement('button');button.className='button ghost file-manager-button';button.textContent='RFP·자료 관리';button.type='button';document.getElementById('projectButton')?.parentElement.append(button);
     const open=async()=>{
       if(working)return;

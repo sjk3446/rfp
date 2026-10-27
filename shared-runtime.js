@@ -6,6 +6,9 @@
   const useShared = !!endpoint && parameters.get('mode') !== 'local' && (parameters.has('project') || parameters.get('mode') === 'shared' || location.hostname.endsWith('.github.io'));
   let project, token='', role='', peer, peerOrigin, ready, timer, busy=false;
   let saveQueue=Promise.resolve();
+  let opening;
+  function finishLoading(){opening?.close();opening=null;}
+  function beginLoading(title,detail){finishLoading();opening=window.ReqlyProjectPicker?.loading(title,detail);}
   const pending = new Map();
   const hex = bytes => [...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
   const nonce = hex(crypto.getRandomValues(new Uint8Array(32)));
@@ -42,6 +45,7 @@
           const field=labels[i];let message='';
           if(field.mustMatch!==undefined&&inputs[i].value!==inputs[field.mustMatch].value)message=`${field.label}: 앞서 입력한 비밀번호와 일치하지 않습니다.`;
           else if(field.differentFrom!==undefined&&inputs[i].value===inputs[field.differentFrom].value)message='관리자용 비밀번호와 사용자용 비밀번호는 서로 다르게 입력해 주세요.';
+          else if(field.equals!==undefined&&inputs[i].value!==field.equals)message='삭제할 프로젝트 이름을 정확히 입력해 주세요.';
           if(message){error.textContent=message;error.hidden=false;inputs[i].setAttribute('aria-invalid','true');return inputs[i];}
         }
         error.textContent='';error.hidden=true;return null;
@@ -50,6 +54,8 @@
       const done=document.createElement('button');done.type='submit';done.className='pages-action primary';done.textContent=title==='새 프로젝트'?'프로젝트 만들기':title==='비밀번호 변경'?'비밀번호 변경':title==='프로젝트 접속'?'프로젝트 열기':'확인';const cancel=document.createElement('button');cancel.type='button';cancel.className='pages-action';cancel.textContent='취소';cancel.setAttribute('data-dialog-cancel','');const actions=document.createElement('div');actions.className='ui-dialog-actions';actions.append(cancel,done);body.append(actions);dialog.append(body);modal.append(dialog);document.body.append(modal);
       const finish=value=>{inputs.forEach((input,index)=>{input.value='';if(labels[index].password)input.type='password';});modal.remove();resolve(value);};
       if(options.cancel)cancel.textContent=options.cancel;
+      if(options.submit)done.textContent=options.submit;
+      const close=document.createElement('button');close.type='button';close.className='pages-close credential-close';close.textContent='×';close.setAttribute('aria-label',`${title} 닫기`);close.onclick=()=>finish(null);body.append(close);
       body.onsubmit=event=>{event.preventDefault();attempted=true;const invalid=validate();if(invalid){invalid.focus();return;}finish(inputs.map(input=>input.value));};cancel.onclick=()=>finish(null);
     });
   }
@@ -124,27 +130,56 @@
             while(!result){
               const entry=await fields('프로젝트 접속',[{label:'프로젝트 비밀번호',password:true}],{description:message||(selection.name?`‘${selection.name}’ 프로젝트의 비밀번호를 입력해 주세요.`:'선택한 프로젝트의 비밀번호를 입력해 주세요.'),cancel:'프로젝트 목록으로'});
               if(entry===null){message='';break;}
-              try{const challenge=await rpc('challenge',{id:selection.id});result=await rpc('login',{id:selection.id,proof:await proof(entry[0],challenge.salt)});}
-              catch(error){if(error.code!=='AUTH')throw error;message=error.message;}
+              try{
+                beginLoading(selection.name?`‘${selection.name}’ 여는 중`:'프로젝트를 불러오는 중입니다','저장소에 연결하고 있습니다.');
+                const challenge=await rpc('challenge',{id:selection.id});
+                opening?.update('비밀번호를 확인하고 있습니다.');const credential=await proof(entry[0],challenge.salt);
+                opening?.update('프로젝트와 저장된 내용을 불러오고 있습니다.');result=await rpc('login',{id:selection.id,proof:credential});
+              }
+              catch(error){finishLoading();if(error.code!=='AUTH')throw error;message=error.message;}
             }
             if(result)accept(result);
           }
-        }catch(error){message=error.message||'프로젝트를 열지 못했습니다. 다시 선택해 주세요.';}
+        }catch(error){finishLoading();message=error.message||'프로젝트를 열지 못했습니다. 다시 선택해 주세요.';}
         selection=null;
         const url=new URL(location.href);url.searchParams.delete('project');url.searchParams.delete('new');
         if(project)url.searchParams.set('project',project.id);
         history.replaceState(null,'',url);
       }
+      opening?.update('요구사항 목록과 화면을 구성하고 있습니다.');
       timer=setInterval(poll,10000);return{workspace:clone(project.workspace)};
     },
     async create(){
       const entry=await fields('새 프로젝트',[{label:'프로젝트 이름'},{label:'관리자용 비밀번호',password:true,autocomplete:'new-password'},{label:'관리자용 비밀번호 확인',password:true,autocomplete:'new-password',mustMatch:1},{label:'사용자용 비밀번호',password:true,autocomplete:'new-password',differentFrom:1},{label:'사용자용 비밀번호 확인',password:true,autocomplete:'new-password',mustMatch:3}],{cancel:'프로젝트 목록으로'});if(!entry)return null;
       const [name,admin,,user]=entry;
       if(admin===user)throw new Error('두 비밀번호는 서로 달라야 합니다.');
-      const salt=hex(crypto.getRandomValues(new Uint8Array(32)));
-      const result=await rpc('create',{name,admin:{salt,proof:await proof(admin,salt)},user:{salt,proof:await proof(user,salt)}});
-      accept(result);const url=new URL(location.href);url.searchParams.set('project',project.id);history.replaceState(null,'',url);return project;
+      beginLoading('프로젝트를 만들고 있습니다','비밀번호를 설정하고 있습니다.');
+      try{
+        const salt=hex(crypto.getRandomValues(new Uint8Array(32)));
+        const credentials={admin:{salt,proof:await proof(admin,salt)},user:{salt,proof:await proof(user,salt)}};
+        opening?.update('새 프로젝트를 저장하고 있습니다.');
+        const result=await rpc('create',{name,...credentials});
+        accept(result);const url=new URL(location.href);url.searchParams.set('project',project.id);history.replaceState(null,'',url);return project;
+      }catch(error){finishLoading();throw error;}
     },
+    async deleteProject(target){
+      if(!/^[a-f0-9]{64}$/.test(target?.id||'')||!target.name)throw new Error('삭제할 프로젝트를 확인해 주세요.');
+      const entry=await fields('프로젝트 삭제',[{label:'관리자용 비밀번호',password:true},{label:'삭제할 프로젝트 이름',equals:target.name}],{
+        description:`‘${target.name}’ 프로젝트와 첨부 파일을 삭제합니다. 공유 링크로도 열 수 없게 됩니다. 자료는 Google Drive 휴지통으로 이동합니다. 관리자용 비밀번호와 위 프로젝트 이름을 입력해 주세요.`,submit:'프로젝트 삭제'});
+      if(!entry)return false;
+      const progress=window.ReqlyProjectPicker?.loading('프로젝트를 삭제하고 있습니다','진행 중인 저장을 마무리하고 있습니다.');
+      try{
+        await saveQueue;busy=true;progress?.update('관리자 비밀번호를 확인하고 있습니다.');
+        const challenge=await rpc('challenge',{id:target.id});
+        const credential=await proof(entry[0],challenge.salt);progress?.update('선택한 프로젝트를 휴지통으로 이동하고 있습니다.');
+        const result=await rpc('deleteProject',{id:target.id,proof:credential,confirmName:entry[1]});
+        if(!result.deleted||result.id!==target.id)throw new Error('삭제 완료를 확인하지 못했습니다. 프로젝트 목록을 다시 확인해 주세요.');
+        directory?.forget(target.id);
+        if(project?.id===target.id)this.disconnect();
+        return true;
+      }finally{busy=false;progress?.close();}
+    },
+    finishLoading,
     async saveItems(items,metadata){
       const original=clone(project),drafts=clone(items),meta=metadata?clone(metadata):undefined;
       const operation=saveQueue.then(async()=>{

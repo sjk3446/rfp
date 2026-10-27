@@ -20,7 +20,12 @@
       memory=[next,...entries.filter(item=>item.id!==project.id)];
       try{storage?.setItem(key,JSON.stringify(memory));}catch(_){}
     }
-    return{list,remember};
+    function forget(id){
+      if(!validId(id))return;
+      memory=list().filter(item=>item.id!==id);
+      try{storage?.setItem(key,JSON.stringify(memory));}catch(_){}
+    }
+    return{list,remember,forget};
   }
   function projectUrl(address,id){
     if(!validId(id))throw new Error('프로젝트 공유 링크를 확인해 주세요.');

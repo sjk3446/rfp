@@ -95,7 +95,7 @@
     modal.querySelector('[data-ai-all]').onchange=event=>{const record=data();if(!record)return;record.checked.clear();if(event.target.checked)candidates(record).items.forEach((item,index)=>{if(!core.duplicate(window.ReqlyApp.requirements,item,select.value))record.checked.add(index);});render();};
     modal.querySelector('[data-ai-settings]').onclick=()=>{modal.classList.remove('open');document.getElementById('aiSettingsButton').click();};
     modal.querySelector('[data-ai-files]').onclick=()=>{modal.classList.remove('open');document.querySelector('.file-manager-button').click();};
-    modal.onclick=event=>{if(event.target===modal||event.target.closest('.pages-close')){if(busy)stopped=true;modal.classList.remove('open');}};
+    modal.onclick=event=>{if(event.target.closest('.pages-close')){if(busy)stopped=true;modal.classList.remove('open');}};
     const button=node('button','AI 요구사항 추출','button ghost');button.type='button';button.onclick=()=>open().catch(error=>window.ReqlyDesign?.notice('AI 요구사항 추출',error.message));
     const tools=document.querySelector('.workspace-more-body')||document.getElementById('uploadButton')?.parentElement;tools?.append(button);
     window.ReqlyRequirementExtraction={open};

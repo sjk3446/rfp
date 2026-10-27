@@ -129,7 +129,7 @@
     modal.querySelector('[data-qa-history-search]').oninput=()=>{historyLimit=8;renderHistory();};modal.querySelector('[data-qa-history-more]').onclick=()=>{historyLimit+=8;renderHistory();};
     modal.querySelector('[data-qa-stop]').onclick=()=>{stopped=true;message('현재 응답이 도착해도 적용하지 않고 중단합니다.');};
     modal.querySelector('[data-qa-settings]').onclick=()=>{modal.classList.remove('open');document.getElementById('aiSettingsButton').click();};
-    modal.onclick=event=>{if(event.target===modal||event.target.closest('.pages-close')){if(busy)stopped=true;modal.classList.remove('open');}};
+    modal.onclick=event=>{if(event.target.closest('.pages-close')){if(busy)stopped=true;modal.classList.remove('open');}};
     const search=document.getElementById('searchInput'),button=node('button','AI 질문','search-ai-button');button.type='button';button.title='입력한 질문을 프로젝트 원문에서 찾아 답변 (Ctrl+Enter)';
     const launch=()=>{const question=search.value;open(question);if(question.trim()){search.value='';search.dispatchEvent(new Event('input',{bubbles:true}));ask();}};
     button.onclick=event=>{event.preventDefault();launch();};search.closest('.search-box').append(button);
