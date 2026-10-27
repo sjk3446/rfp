@@ -57,7 +57,10 @@
       const current=shared()&&project.id===window.ReqlyShared.project.id;
       const date=new Date(project.updatedAt),stamp=Number.isNaN(date.getTime())?'마지막 저장일 확인 전':`마지막 확인한 저장: ${date.toLocaleString('ko-KR')}`;
       info.append(name,node('p',stamp));row.append(info);
-      const actions=window.ReqlyProjectPicker.actions(project,{current,onOpen:()=>navigateProject(window.ReqlyProjectDirectory.projectUrl(location.href,project.id)),onDelete:async()=>{
+      const actions=window.ReqlyProjectPicker.actions(project,{current,onOpen:()=>navigateProject(window.ReqlyProjectDirectory.projectUrl(location.href,project.id)),onRename:async()=>{
+        try{if(await window.ReqlyShared.renameProject(project)){renderSettings();settingsNotice('프로젝트 이름을 변경했습니다.');}}
+        catch(error){settingsNotice(error.message);}
+      },onDelete:async()=>{
         try{
           if(current&&window.ReqlyApp?.confirmLeave&&!(await window.ReqlyApp.confirmLeave()))return;
           if(!(await window.ReqlyShared.deleteProject(project)))return;

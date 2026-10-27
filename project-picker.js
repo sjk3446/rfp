@@ -20,13 +20,15 @@
     copy.onclick=async()=>{try{await navigator.clipboard.writeText(input.value);feedback.textContent='공유 링크를 복사했습니다. 사용자용 비밀번호를 함께 전달해 주세요.';}catch(_){feedback.textContent='아래 링크를 선택하여 복사해 주세요.';input.focus();input.select();}};
     close.onclick=()=>modal.remove();actions.append(copy);body.append(node('h2','프로젝트 공유'),node('p',project.name,'ui-form-intro'),input,feedback,actions,close);panel.append(body);modal.append(panel);document.body.append(modal);
   }
-  function actions(project,{onOpen,onDelete,current=false}={}){
+  function actions(project,{onOpen,onDelete,onRename,current=false}={}){
     const group=node('div',null,'shared-project-actions'),open=node('button',current?'현재 프로젝트':'열기','pages-action primary'),copy=node('button','공유','pages-action'),remove=node('button','삭제','pages-action danger');
+    const rename=node('button','이름 변경','pages-action');
     open.disabled=current;let working=false;
-    for(const [button,label]of [[open,'열기'],[copy,'공유'],[remove,'삭제']]){button.type='button';button.setAttribute('aria-label',`${project.name} ${label}`);}
+    for(const [button,label]of [[open,'열기'],[copy,'공유'],[rename,'이름 변경'],[remove,'삭제']]){button.type='button';button.setAttribute('aria-label',`${project.name} ${label}`);}
     open.onclick=onOpen;copy.onclick=()=>share(project);
-    remove.onclick=async()=>{if(working)return;working=true;remove.disabled=copy.disabled=open.disabled=true;try{await onDelete?.();}finally{working=false;remove.disabled=copy.disabled=false;open.disabled=current;}};
-    group.append(open,copy,remove);return group;
+    const run=async fn=>{if(working)return;working=true;remove.disabled=rename.disabled=copy.disabled=open.disabled=true;try{await fn?.();}finally{working=false;remove.disabled=rename.disabled=copy.disabled=false;open.disabled=current;}};
+    remove.onclick=()=>run(onDelete);rename.onclick=()=>run(onRename);
+    group.append(open,copy,rename,remove);return group;
   }
   function choose({projects=[],message=''}={}){
     return new Promise(resolve=>{
@@ -50,7 +52,10 @@
         for(const project of filtered){
           const row=node('article',null,'shared-project-row'),info=node('div'),date=new Date(project.updatedAt);
           info.append(node('h3',project.name),node('p',Number.isNaN(date.getTime())?'저장일 확인 전':`마지막 확인한 저장: ${date.toLocaleString('ko-KR')}`));
-          const buttons=actions(project,{onOpen:()=>finish({id:project.id,name:project.name}),onDelete:async()=>{
+          const buttons=actions(project,{onOpen:()=>finish({id:project.id,name:project.name}),onRename:async()=>{
+            try{const renamed=await window.ReqlyShared.renameProject(project);if(renamed){projects=projects.map(item=>item.id===renamed.id?{...item,name:renamed.name,updatedAt:renamed.updatedAt}:item);render();feedback.hidden=false;feedback.textContent='프로젝트 이름을 변경했습니다.';}}
+            catch(error){feedback.hidden=false;feedback.textContent=error.message;}
+          },onDelete:async()=>{
             try{if(await window.ReqlyShared.deleteProject(project)){projects=projects.filter(item=>item.id!==project.id);render();feedback.hidden=false;feedback.textContent=`‘${project.name}’ 프로젝트를 삭제했습니다.`;}}
             catch(error){feedback.hidden=false;feedback.textContent=error.message;}
           }});row.append(info,buttons);area.append(row);

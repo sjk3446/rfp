@@ -24,12 +24,13 @@
       if(title==='새 프로젝트')body.className+=' credential-form';
       const intro=document.createElement('p');intro.className='ui-form-intro';intro.textContent=options.description||(title==='새 프로젝트'?'관리자용과 사용자용 비밀번호를 각각 설정해 주세요. 관리자만 비밀번호를 변경할 수 있습니다.':title==='비밀번호 변경'?'변경할 비밀번호를 선택하고 새 비밀번호를 두 번 입력해 주세요.':'프로젝트 비밀번호를 입력하면 문서와 검토 내용을 열 수 있습니다.');body.append(intro);
       const error=document.createElement('p');error.id=`error-${crypto.randomUUID()}`;error.setAttribute('role','alert');error.style.color='#b42335';error.hidden=true;let attempted=false;
-      const inputs=labels.map(({label,password,options,autocomplete})=>{
+      const inputs=labels.map(({label,password,options,autocomplete,value,maxLength})=>{
         const wrap=document.createElement('div');wrap.className='pages-field';
         const caption=document.createElement('label');caption.textContent=label;caption.style.fontWeight='750';
         const input=document.createElement(options?'select':'input');input.id=`field-${crypto.randomUUID()}`;caption.htmlFor=input.id;
         if(options){options.forEach(([value,text])=>{const option=document.createElement('option');option.value=value;option.textContent=text;input.append(option);});}
         else{input.type=password?'password':'text';input.autocomplete=autocomplete||(password?'current-password':'off');}
+        if(value!==undefined)input.value=value;if(maxLength)input.maxLength=maxLength;
         input.required=true;input.setAttribute('aria-describedby',error.id);wrap.append(caption);
         if(password){
           const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;align-items:center';input.style.minWidth='0';
@@ -46,6 +47,8 @@
           if(field.mustMatch!==undefined&&inputs[i].value!==inputs[field.mustMatch].value)message=`${field.label}: 앞서 입력한 비밀번호와 일치하지 않습니다.`;
           else if(field.differentFrom!==undefined&&inputs[i].value===inputs[field.differentFrom].value)message='관리자용 비밀번호와 사용자용 비밀번호는 서로 다르게 입력해 주세요.';
           else if(field.equals!==undefined&&inputs[i].value!==field.equals)message='삭제할 프로젝트 이름을 정확히 입력해 주세요.';
+          else if(field.nonBlank&&!inputs[i].value.trim())message='프로젝트 이름을 입력해 주세요.';
+          else if(field.maxLength&&inputs[i].value.trim().length>field.maxLength)message=`프로젝트 이름은 ${field.maxLength}자 이하로 입력해 주세요.`;
           if(message){error.textContent=message;error.hidden=false;inputs[i].setAttribute('aria-invalid','true');return inputs[i];}
         }
         error.textContent='';error.hidden=true;return null;
@@ -104,6 +107,7 @@
     // A load started before a save can finish after it. Never roll back revisions.
     if(result.project&&project?.id===result.project.id&&result.project.version<project.version)return project;
     if(result.project)project=clone(result.project);
+    if(result.project&&window.ReqlyPortal?.project?.id===project.id)window.ReqlyPortal.project.name=project.name;
     if(result.project)directory?.remember(project,!!result.token);
     window.dispatchEvent(new CustomEvent('reqly-shared-update',{detail:{project:clone(project),role}}));
     return project;
@@ -178,6 +182,26 @@
         if(project?.id===target.id)this.disconnect();
         return true;
       }finally{busy=false;progress?.close();}
+    },
+    async renameProject(target){
+      if(!/^[a-f0-9]{64}$/.test(target?.id||'')||!target.name)throw new Error('변경할 프로젝트를 확인해 주세요.');
+      const signedIn=project?.id===target.id&&role==='admin'&&!!token;
+      const labels=[{label:'프로젝트 이름',value:target.name,maxLength:200,nonBlank:true}];
+      if(!signedIn)labels.push({label:'관리자용 비밀번호',password:true});
+      const entry=await fields('프로젝트 이름 변경',labels,{description:signedIn?'새 프로젝트 이름을 입력해 주세요.':'새 이름과 해당 프로젝트의 관리자용 비밀번호를 입력해 주세요.',submit:'이름 저장'});
+      if(!entry)return null;const name=entry[0].trim();if(name===target.name)return target;
+      const progress=window.ReqlyProjectPicker?.loading('프로젝트 이름을 저장하고 있습니다','변경 내용을 확인하고 있습니다.');
+      const operation=saveQueue.then(async()=>{
+        busy=true;
+        try{
+          const auth=signedIn?{}:{proof:await proof(entry[1],(await rpc('challenge',{id:target.id})).salt)};
+          const result=await rpc('renameProject',{id:target.id,name,expectedName:target.name,...auth});
+          if(result.project?.id!==target.id||result.project?.name!==name)throw new Error('이름 저장을 확인하지 못했습니다. 다시 확인해 주세요.');
+          if(project?.id===target.id)accept(result);else directory?.remember(result.project);
+          return result.project;
+        }finally{busy=false;progress?.close();}
+      });
+      saveQueue=operation.catch(()=>{});return operation;
     },
     finishLoading,
     async saveItems(items,metadata){

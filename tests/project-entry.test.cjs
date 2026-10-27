@@ -13,7 +13,7 @@ class Element {
 }
 const all=node=>[node,...node.children.flatMap(all)];
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
-function browser({query='',projects=true,fail=false,holdLogin=false,deleteError=false}={}){
+function browser({query='',projects=true,fail=false,holdLogin=false,deleteError=false,renameError=false,role='user'}={}){
   const body=new Element('body'),listeners={},requests=[],cache=new Map(),held=[],copied=[];let nonce,loginCount=0;
   const storage={getItem:key=>cache.get(key),setItem:(key,value)=>cache.set(key,value)};
   if(projects)for(const letter of ['a','b','c'])directory.create(storage).remember({id:letter.repeat(64),name:'프로젝트 '+letter,updatedAt:'2026-10-26T00:00:00Z'});
@@ -22,8 +22,9 @@ function browser({query='',projects=true,fail=false,holdLogin=false,deleteError=
     if(r.action==='challenge')result={ok:true,value:{salt:'0'.repeat(64)}};
     else if(r.action==='login'){
       loginCount++;
-      result=fail&&loginCount===1?{ok:false,code:'AUTH',error:'비밀번호가 일치하지 않습니다.'}:{ok:true,value:{project:{id:r.id,name:'프로젝트 '+r.id[0],version:1,workspace:{requirements:[]}},role:'user',token:'fixture'}};
+      result=fail&&loginCount===1?{ok:false,code:'AUTH',error:'비밀번호가 일치하지 않습니다.'}:{ok:true,value:{project:{id:r.id,name:'프로젝트 '+r.id[0],version:1,workspace:{requirements:[]}},role,token:'fixture'}};
     }else if(r.action==='deleteProject')result=deleteError?{ok:false,code:'AUTH',error:'관리자 비밀번호를 확인해 주세요.'}:{ok:true,value:{deleted:true,id:r.id}};
+    else if(r.action==='renameProject')result=renameError?{ok:false,code:'AUTH',error:'이름을 변경할 권한이 없습니다.'}:{ok:true,value:{project:{id:r.id,name:r.name,version:2,updatedAt:'2026-10-27T02:00:00Z',workspace:{requirements:[]}}}};
     else result={ok:false,error:'Unexpected '+r.action};
     const deliver=()=>listeners.message({origin:'https://n-test-script.googleusercontent.com',source:peer,data:{channel:'reqly-drive-v1',nonce,requestId:message.requestId,result}});
     if(holdLogin&&r.action==='login')held.push(deliver);else queueMicrotask(deliver);
@@ -39,6 +40,7 @@ function browser({query='',projects=true,fail=false,holdLogin=false,deleteError=
   return{api:context.window.ReqlyShared,body,requests,location,find,click,password,copied,release:()=>held.splice(0).forEach(fn=>fn()),
     action(letter,label){const row=all(body).find(node=>node.tag==='article'&&all(node).some(n=>n.textContent==='프로젝트 '+letter));assert.ok(row);return all(row).find(node=>node.tag==='button'&&node.textContent===label).onclick();},
     submitDelete(name){const form=password(),inputs=all(form).filter(node=>node.tag==='input');inputs[0].value='fixture-password';inputs[1].value=name;form.onsubmit({preventDefault(){}});},
+    submitRename(name){const form=all(body).find(node=>node.tag==='form'&&all(node).some(n=>n.textContent==='프로젝트 이름 변경')),inputs=all(form).filter(node=>node.tag==='input');inputs[0].value=name;if(inputs[1])inputs[1].value='fixture-password';form.onsubmit({preventDefault(){}});},
     select(letter){const row=all(body).find(node=>node.tag==='article'&&all(node).some(n=>n.textContent==='프로젝트 '+letter));assert.ok(row);all(row).find(node=>node.tag==='button').onclick();},
     submitPassword(){const form=password();all(form).find(node=>node.type==='password').value='fixture-password';form.onsubmit({preventDefault(){}});}};
 }
@@ -111,4 +113,35 @@ test('successful deletion forgets only selected project after server confirmatio
 test('failed deletion preserves every project in the directory and reports the failure',async()=>{
   const b=browser({deleteError:true});b.api.start();await tick();const task=b.action('a','삭제');await tick();b.submitDelete('프로젝트 a');await task;
   assert.equal(b.api.knownProjects().length,3);assert.equal(all(b.body).filter(x=>x.tag==='article').length,3);assert.ok(b.find('p','관리자 비밀번호를 확인해 주세요.'));
+});
+
+test('rename from the list updates only the selected name after confirmation and keeps the URL',async()=>{
+  const b=browser();b.api.start();await tick();const task=b.action('b','이름 변경');await tick();
+  assert.ok(all(b.body).some(node=>node.tag==='input'&&node.value==='프로젝트 b'));b.submitRename('  변경한 이름  ');await task;
+  assert.equal(b.api.project,undefined);assert.ok(b.find('h3','변경한 이름'));assert.equal(b.api.knownProjects().length,3);
+  assert.equal(b.api.knownProjects().find(p=>p.id==='b'.repeat(64)).name,'변경한 이름');assert.deepEqual(b.requests.map(r=>r.action),['challenge','renameProject']);
+});
+
+test('blank name and cancel keep the old name without sending a request',async()=>{
+  const b=browser();b.api.start();await tick();const task=b.action('a','이름 변경');await tick();b.submitRename('   ');
+  assert.ok(b.find('p','프로젝트 이름을 입력해 주세요.'));assert.equal(b.requests.length,0);b.click('취소');await task;assert.ok(b.find('h3','프로젝트 a'));
+});
+
+test('failed rename leaves the directory unchanged and reports failure',async()=>{
+  const b=browser({renameError:true});b.api.start();await tick();const task=b.action('c','이름 변경');await tick();b.submitRename('실패한 이름');await task;
+  assert.ok(b.find('h3','프로젝트 c'));assert.ok(b.find('p','이름을 변경할 권한이 없습니다.'));assert.equal(b.api.knownProjects().find(p=>p.id==='c'.repeat(64)).name,'프로젝트 c');
+});
+
+test('current administrator renames without entering a password again or switching projects',async()=>{
+  const b=browser({role:'admin'}),boot=b.api.start();await tick();b.select('a');await tick();b.submitPassword();await boot;b.api.finishLoading();const address=b.location.href;
+  const task=b.api.renameProject(b.api.project);await tick();assert.equal(all(b.body).some(n=>n.type==='password'),false);b.submitRename('현재 프로젝트 새 이름');await task;
+  assert.equal(b.api.project.name,'현재 프로젝트 새 이름');assert.equal(b.api.project.id,'a'.repeat(64));assert.equal(b.location.href,address);assert.deepEqual(b.requests.map(r=>r.action),['challenge','login','renameProject']);
+});
+
+test('renaming another project preserves the active project and its connection',async()=>{
+  const b=browser({role:'admin'}),boot=b.api.start();await tick();b.select('a');await tick();b.submitPassword();await boot;b.api.finishLoading();
+  const original=JSON.stringify(b.api.project),address=b.location.href,target=b.api.knownProjects().find(p=>p.id==='b'.repeat(64));
+  const task=b.api.renameProject(target);await tick();assert.ok(b.password());b.submitRename('다른 프로젝트 새 이름');await task;
+  assert.equal(JSON.stringify(b.api.project),original);assert.equal(b.location.href,address);assert.equal(b.api.role,'admin');assert.equal(b.api.knownProjects().find(p=>p.id===target.id).name,'다른 프로젝트 새 이름');
+  assert.equal(b.requests.at(-1).id,target.id);assert.ok(b.requests.at(-1).proof);
 });

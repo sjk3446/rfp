@@ -15,7 +15,7 @@ function doGet(e) {
 
 function reqlyRpc(request) {
   try {
-    const actions = ['challenge', 'create', 'login', 'load', 'save', 'password', 'upload', 'download', 'removeFile', 'selectRfp', 'deleteProject'];
+    const actions = ['challenge', 'create', 'login', 'load', 'save', 'password', 'upload', 'download', 'removeFile', 'selectRfp', 'deleteProject', 'renameProject'];
     if (!request || !actions.includes(request.action)) throw new Error('지원하지 않는 요청입니다.');
     const lock = LockService.getScriptLock();
     lock.waitLock(25000);
@@ -139,6 +139,18 @@ function dispatch_(r) {
     // Preserve project.json and attachments together for the Drive owner's recovery.
     record.folder.setTrashed(true);
     return { deleted: true, id: data.id };
+  }
+  if (r.action === 'renameProject') {
+    if (r.proof) {
+      if (loginRole_(record, r.proof) !== 'admin') fail_('FORBIDDEN', '프로젝트 이름은 관리자만 변경할 수 있습니다.');
+    } else authorize_(record, r.token, true);
+    const name = typeof r.name === 'string' ? r.name.trim() : '';
+    if (!name || name.length > 200) throw new Error('프로젝트 이름은 1~200자로 입력해 주세요.');
+    if (data.name !== name) {
+      if (r.expectedName !== data.name) fail_('CONFLICT', '프로젝트 이름이 변경되었습니다. 프로젝트를 다시 연 뒤 수정해 주세요.');
+      data.name = name; data.version += 1; data.updatedAt = new Date().toISOString(); write_(record);
+    }
+    return { project: public_(data) };
   }
   const role = authorize_(record, r.token, ['password', 'removeFile'].includes(r.action));
   if (r.action === 'load') {

@@ -20,6 +20,27 @@ function backend(activeUser='owner@example.test'){
   return{rpc,create,initialize:()=>ctx.initializeStorage(),folderFor:id=>[...folders.values()].find(folder=>folder.getFoldersByName(id).hasNext())?.getFoldersByName(id).next()};
 }
 test('only the script owner may initialize storage',()=>{assert.equal(backend().initialize().ready,true);assert.throws(()=>backend('').initialize(),/소유자/);assert.throws(()=>backend('other@example.test').initialize(),/소유자/);});
+
+test('renaming requires administrator credentials and rejects blank, long and stale names',()=>{
+  const {rpc,create}=backend(),p=create(),id=p.project.id;
+  const user=rpc({action:'login',id,proof:'2'.repeat(64)}).value;
+  for(const auth of [{},{token:user.token},{proof:'2'.repeat(64)}])assert.equal(rpc({action:'renameProject',id,name:'새 이름',expectedName:'Test',...auth}).ok,false);
+  for(const name of ['   ','a'.repeat(201),{}])assert.equal(rpc({action:'renameProject',id,token:p.token,name,expectedName:'Test'}).ok,false);
+  assert.equal(rpc({action:'renameProject',id,token:p.token,name:'새 이름',expectedName:'stale'}).code,'CONFLICT');
+  assert.equal(rpc({action:'load',id,token:p.token}).value.project.name,'Test');
+});
+
+test('rename preserves project ID, workspace, passwords and other projects; polling sees it',()=>{
+  const {rpc,create}=backend(),p=create(),other=create(),auth={id:p.project.id,token:p.token};
+  rpc({action:'save',...auth,changes:[{key:'r1',expectedRevision:0,item:{key:'r1',description:'보존할 원문',questions:[{question:'보존할 질문'}]}}]});
+  const before=rpc({action:'upload',...auth,kind:'rfp',name:'original.pdf',base64:'YQ=='}).value.project;
+  const renamed=rpc({action:'renameProject',...auth,name:'  변경한 프로젝트  ',expectedName:'Test'}).value.project;
+  assert.equal(renamed.name,'변경한 프로젝트');assert.equal(renamed.id,before.id);assert.deepEqual(renamed.workspace,before.workspace);assert.equal(renamed.version,before.version+1);
+  assert.equal(rpc({action:'load',...auth,version:before.version}).value.project.name,renamed.name);
+  assert.equal(rpc({action:'login',id:p.project.id,proof:'2'.repeat(64)}).value.project.name,renamed.name);
+  assert.equal(rpc({action:'load',id:other.project.id,token:other.token}).value.project.name,'Test');
+  assert.equal(rpc({action:'renameProject',id:p.project.id,proof:'1'.repeat(64),name:'다시 변경',expectedName:renamed.name}).value.project.name,'다시 변경');
+});
 test('create returns project-scoped administrator token and no password hashes',()=>{const{create}=backend(),p=create();assert.equal(p.role,'admin');assert.equal(p.project.workspace.requirements.length,0);assert.equal(JSON.stringify(p.project).includes('auth'),false);});
 
 test('project deletion requires fresh administrator proof and exact name, not just a token',()=>{
