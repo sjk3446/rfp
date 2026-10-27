@@ -1,4 +1,4 @@
-/* Project selection is available before any storage connection or password. */
+/* Project links stay available; the complete directory requires its own access. */
 (() => {
   'use strict';
   const node=(tag,text,className)=>{const el=document.createElement(tag);if(text)el.textContent=text;if(className)el.className=className;return el;};
@@ -30,42 +30,74 @@
     remove.onclick=()=>run(onDelete);rename.onclick=()=>run(onRename);
     group.append(open,copy,rename,remove);return group;
   }
-  function choose({projects=[],message=''}={}){
+  function directoryPanel({onOpen,onRename,onDelete,currentId=''}={}){
+    const element=node('section',null,'directory-panel');
+    const gate=node('div',null,'directory-gate'),unlock=node('button','관리자로 접속','pages-action primary'),setup=node('button','목록 관리자 비밀번호 설정','pages-action');unlock.type=setup.type='button';
+    gate.append(node('h3','전체 프로젝트 목록'),node('p','전체 프로젝트 목록은 목록 관리자 비밀번호로 열 수 있습니다.'),unlock,setup);
+    const tools=node('div',null,'directory-tools'),count=node('span',null,'directory-count');
+    const refresh=node('button','새로고침','pages-action'),password=node('button','목록 비밀번호 변경','pages-action'),lock=node('button','목록 잠금','pages-action');
+    for(const button of [refresh,password,lock])button.type='button';tools.append(count,refresh,password,lock);
+    const search=node('input');search.type='search';search.placeholder='프로젝트 이름 검색';search.setAttribute('aria-label','프로젝트 이름 검색');search.className='project-picker-search';
+    const area=node('div');area.setAttribute('aria-label','전체 프로젝트 목록');
+    const feedback=node('p',null,'fm-notice');feedback.setAttribute('role','status');feedback.hidden=true;
+    element.append(gate,tools,search,feedback,area);let working=false,destroyed=false;
+    const notify=text=>{feedback.textContent=text||'';feedback.hidden=!text;};
+    const setWorking=value=>{working=value;for(const button of [unlock,setup,refresh,password,lock])button.disabled=value;};
+    const perform=async(fn,message)=>{
+      if(working)return;setWorking(true);notify('');
+      try{const result=await fn();if(result&&message)notify(message);}
+      catch(error){notify(error.message||'프로젝트 목록을 불러오지 못했습니다.');}
+      finally{setWorking(false);render();}
+    };
+    const render=()=>{
+      if(destroyed)return;
+      const unlocked=!!window.ReqlyShared?.directoryUnlocked;
+      gate.hidden=unlocked;setup.hidden=!window.ReqlyShared?.canSetupDirectory;tools.hidden=search.hidden=!unlocked;area.replaceChildren();
+      if(!unlocked){search.value='';count.textContent='';return;}
+      const projects=window.ReqlyShared.knownProjects(),query=search.value.trim().toLocaleLowerCase('ko');
+      count.textContent=`전체 ${projects.length}개`;
+      const filtered=projects.filter(project=>project.name.toLocaleLowerCase('ko').includes(query));
+      if(!filtered.length)area.append(node('p',projects.length?'검색된 프로젝트가 없습니다.':'저장된 공유 프로젝트가 없습니다. 새 프로젝트를 만들어 주세요.','fm-empty'));
+      for(const project of filtered){
+        const row=node('article',null,'shared-project-row'),info=node('div'),date=new Date(project.updatedAt);
+        info.append(node('h3',project.name),node('p',Number.isNaN(date.getTime())?'저장일 확인 전':`마지막 저장: ${date.toLocaleString('ko-KR')}`));
+        row.append(info,actions(project,{current:project.id===currentId,onOpen:()=>onOpen?.(project),onRename:async()=>{
+          try{if(await(onRename?onRename(project):window.ReqlyShared.renameProject(project))){render();notify('프로젝트 이름을 변경했습니다.');}}
+          catch(error){notify(error.message);}
+        },onDelete:async()=>{
+          try{if(await(onDelete?onDelete(project):window.ReqlyShared.deleteProject(project))){render();notify('프로젝트를 삭제했습니다.');}}
+          catch(error){notify(error.message);}
+        }}));area.append(row);
+      }
+    };
+    unlock.onclick=()=>perform(()=>window.ReqlyShared.unlockDirectory());
+    setup.onclick=()=>perform(()=>window.ReqlyShared.setupDirectory());
+    refresh.onclick=()=>perform(()=>window.ReqlyShared.refreshDirectory(),'프로젝트 목록을 새로 불러왔습니다.');
+    password.onclick=()=>perform(()=>window.ReqlyShared.changeDirectoryPassword(),'목록 관리자 비밀번호를 변경했습니다.');
+    lock.onclick=()=>{window.ReqlyShared.lockDirectory();notify('전체 프로젝트 목록을 잠갔습니다.');render();};
+    search.oninput=render;
+    const onUpdate=event=>{if(!window.ReqlyShared?.directoryUnlocked)notify('');render();if(event.detail?.message)notify(event.detail.message);};
+    window.addEventListener('reqly-directory-update',onUpdate);render();
+    if(window.ReqlyShared?.directoryUnlocked&&window.ReqlyShared.directoryLoaded===false)perform(()=>window.ReqlyShared.refreshDirectory());
+    return{element,render,destroy(){destroyed=true;area.replaceChildren();search.value='';window.removeEventListener?.('reqly-directory-update',onUpdate);}};
+  }
+  function choose({message=''}={}){
     return new Promise(resolve=>{
       const modal=node('div',null,'pages-modal open project-picker');
       const dialog=node('section',null,'pages-dialog');dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-label','프로젝트 목록');
-      const header=node('header'),intro=node('div');intro.append(node('h2','프로젝트 목록'),node('p','작업할 프로젝트를 선택한 다음 비밀번호를 입력해 주세요.'));header.append(intro);
+      const header=node('header'),intro=node('div');intro.append(node('h2','프로젝트'),node('p','공유받은 링크로 접속하거나 관리자 전용 목록에서 프로젝트를 선택하세요.'));header.append(intro);
       const body=node('div',null,'pages-body');
       const feedback=node('p',message,'fm-notice');feedback.setAttribute('role','status');feedback.hidden=!message;body.append(feedback);
-      const search=node('input');search.type='search';search.placeholder='프로젝트 이름 검색';search.setAttribute('aria-label','프로젝트 이름 검색');search.className='project-picker-search';body.append(search);
-      const area=node('div');area.setAttribute('aria-label','저장된 프로젝트');body.append(area);
-      const hint=node('p','이 브라우저에서 만들거나 접속한 공유 프로젝트가 표시됩니다. 목록에 없는 기존 프로젝트는 공유 링크로 열어 주세요.','ui-form-intro');body.append(hint);
+      let directoryView;
+      const finish=value=>{directoryView?.destroy();modal.remove();resolve(value);};
+      directoryView=directoryPanel({onOpen:project=>finish({id:project.id,name:project.name})});body.append(directoryView.element);
       const form=node('form',null,'shared-project-link'),label=node('label',null,'pages-field'),input=node('input');input.type='url';input.required=true;input.placeholder='https://…?project=…';input.setAttribute('aria-label','기존 프로젝트 공유 링크');label.append(node('span','기존 프로젝트 공유 링크'),input);
       const link=node('button','링크로 열기','pages-action');link.type='submit';form.append(label,link);body.append(form);
       const footer=node('div',null,'project-picker-footer'),create=node('button','새 프로젝트 만들기','pages-action');create.type='button';footer.append(node('span','새로운 RFP 작업을 시작하시나요?'),create);body.append(footer);
-      // No default submit/create action on Escape while a project is not open.
-      const finish=value=>{modal.remove();resolve(value);};
-      const render=()=>{
-        area.replaceChildren();const query=search.value.trim().toLocaleLowerCase('ko');
-        const filtered=projects.filter(project=>project.name.toLocaleLowerCase('ko').includes(query));
-        if(!filtered.length)area.append(node('p',projects.length?'검색된 프로젝트가 없습니다.':'아직 이 브라우저에 기록된 프로젝트가 없습니다. 기존 공유 링크로 열거나 새 프로젝트를 만들어 주세요.','fm-empty'));
-        for(const project of filtered){
-          const row=node('article',null,'shared-project-row'),info=node('div'),date=new Date(project.updatedAt);
-          info.append(node('h3',project.name),node('p',Number.isNaN(date.getTime())?'저장일 확인 전':`마지막 확인한 저장: ${date.toLocaleString('ko-KR')}`));
-          const buttons=actions(project,{onOpen:()=>finish({id:project.id,name:project.name}),onRename:async()=>{
-            try{const renamed=await window.ReqlyShared.renameProject(project);if(renamed){projects=projects.map(item=>item.id===renamed.id?{...item,name:renamed.name,updatedAt:renamed.updatedAt}:item);render();feedback.hidden=false;feedback.textContent='프로젝트 이름을 변경했습니다.';}}
-            catch(error){feedback.hidden=false;feedback.textContent=error.message;}
-          },onDelete:async()=>{
-            try{if(await window.ReqlyShared.deleteProject(project)){projects=projects.filter(item=>item.id!==project.id);render();feedback.hidden=false;feedback.textContent=`‘${project.name}’ 프로젝트를 삭제했습니다.`;}}
-            catch(error){feedback.hidden=false;feedback.textContent=error.message;}
-          }});row.append(info,buttons);area.append(row);
-        }
-      };
-      search.oninput=render;
-      form.onsubmit=event=>{event.preventDefault();try{const id=window.ReqlyProjectDirectory.idFromUrl(input.value);finish({id,name:projects.find(project=>project.id===id)?.name||''});}catch(error){feedback.hidden=false;feedback.textContent=error.message;}};
+      form.onsubmit=event=>{event.preventDefault();try{const id=window.ReqlyProjectDirectory.idFromUrl(input.value);finish({id,name:''});}catch(error){feedback.hidden=false;feedback.textContent=error.message;}};
       create.onclick=()=>finish({create:true});
-      dialog.append(header,body);modal.append(dialog);document.body.append(modal);render();
+      dialog.append(header,body);modal.append(dialog);document.body.append(modal);
     });
   }
-  window.ReqlyProjectPicker={choose,loading,share,actions};
+  window.ReqlyProjectPicker={choose,loading,share,actions,directoryPanel};
 })();

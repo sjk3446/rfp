@@ -2,18 +2,19 @@
 (() => {
   'use strict';
   const core=window.ReqlyProjectQA,filesCache=new Map(),answers=new Map();
-  let modal,input,status,result,scope,busy=false,stopped=false,project='',previousQuestion='',previousContext='',pendingRecord=null,historyLimit=8,historyRecords=[],historyRevision=0;
+  let modal,input,status,result,scope,busy=false,stopped=false,project='',previousQuestion='',previousContext='',pendingRecord=null,historyLimit=8,historyRecords=[],historyRevision=0,author=null;
   const selectedHistory=new Set(),store=window.ReqlyQuestionStore;
   const node=(tag,text,className)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;};
   const message=text=>{status.textContent=text;};
   const guard=id=>{if(stopped||id!==window.ReqlyApp.projectId)throw new Error('질문을 중단했습니다.');};
   function controls(){modal.querySelectorAll('[data-qa-ask],[data-qa-expand],[data-qa-settings],[data-qa-save]').forEach(button=>button.disabled=busy);input.disabled=busy;modal.querySelector('[data-qa-stop]').hidden=!busy;modal.querySelector('[data-qa-save]').hidden=!pendingRecord;visibilityControls();}
-  function visibilityControls(){modal.querySelector('[data-qa-private]').disabled=busy||!selectedHistory.size;modal.querySelector('[data-qa-share]').disabled=busy||!selectedHistory.size||!window.ReqlyShared?.enabled;modal.querySelector('[data-qa-selected]').textContent=`${selectedHistory.size}개 선택`;}
-  async function records(id){return store.merge(await store.list(id),window.ReqlyApp.projectId===id?window.ReqlyApp.questionHistory||[]:[]);}
+  const canManage=record=>store.canManage(record,author?.authorId,window.ReqlyShared?.enabled?window.ReqlyShared.role:'');
+  function visibilityControls(){const chosen=historyRecords.filter(record=>selectedHistory.has(record.id)),allowed=chosen.length&&chosen.every(canManage);modal.querySelector('[data-qa-private]').disabled=busy||!allowed;modal.querySelector('[data-qa-share]').disabled=busy||!chosen.some(record=>record.visibility!=='shared')||!window.ReqlyShared?.enabled;modal.querySelector('[data-qa-delete]').disabled=busy||!allowed;modal.querySelectorAll('[data-qa-delete-row]').forEach(button=>button.disabled=busy||!canManage(historyRecords.find(record=>record.id===button.dataset.qaDeleteRow)||{visibility:'shared'}));modal.querySelector('[data-qa-selected]').textContent=`${selectedHistory.size}개 선택`;}
+  async function records(id){return store.merge(await store.list(id),window.ReqlyApp.projectId===id?window.ReqlyApp.questionHistory||[]:[],window.ReqlyApp.projectId===id?window.ReqlyApp.deletedQuestionIds||[]:[]);}
   async function renderHistory(){
     const revision=++historyRevision,id=project;let all;
-    try{all=await records(id);}catch(error){message(`개인 히스토리를 읽지 못했습니다: ${error.message}`);return;}
-    if(revision!==historyRevision||project!==id)return;historyRecords=all;
+    let identity;try{[all,identity]=await Promise.all([records(id),store.owner(id).catch(()=>null)]);}catch(error){message(`개인 히스토리를 읽지 못했습니다: ${error.message}`);return;}
+    if(revision!==historyRevision||project!==id)return;historyRecords=all;author=identity;
     for(const key of selectedHistory)if(!all.some(record=>record.id===key))selectedHistory.delete(key);
     const query=core.normalized(modal.querySelector('[data-qa-history-search]').value);
     const list=all.filter(record=>record?.question&&Array.isArray(record.answer?.claims)).filter(record=>!query||core.normalized(record.question+' '+record.answer.claims.map(claim=>claim.text).join(' ')).includes(query)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -23,19 +24,32 @@
     list.slice(0,historyLimit).forEach(record=>{
       const row=node('div',undefined,'qa-history-row'),check=node('input');check.type='checkbox';check.checked=selectedHistory.has(record.id);check.setAttribute('aria-label',`${record.question} 선택`);check.onchange=()=>{check.checked?selectedHistory.add(record.id):selectedHistory.delete(record.id);visibilityControls();};
       const button=node('button',undefined,'qa-history-item');button.type='button';button.append(node('strong',record.question),node('small',`${record.visibility==='shared'?'프로젝트 공유':'나만 보기'} · ${new Date(record.createdAt).toLocaleString('ko-KR')} · ${record.model||'문서 검색'}`));
-      button.onclick=()=>{if(busy)return;input.value=record.question;scope.textContent=record.scope||'저장 당시의 문서 근거';show(record.answer,record.question,record.model||'문서 검색',true);message(`히스토리 열람 · ${new Date(record.createdAt).toLocaleString('ko-KR')} 저장 당시 자료를 기준으로 한 답변입니다.`);};row.append(check,button);area.append(row);
+      button.onclick=()=>{if(busy)return;input.value=record.question;scope.textContent=record.scope||'저장 당시의 문서 근거';show(record.answer,record.question,record.model||'문서 검색',true);message(`히스토리 열람 · ${new Date(record.createdAt).toLocaleString('ko-KR')} 저장 당시 자료를 기준으로 한 답변입니다.`);};
+      const remove=node('button','삭제','pages-action danger');remove.type='button';remove.dataset.qaDeleteRow=record.id;remove.setAttribute('aria-label',`${record.question} 삭제`);remove.title=canManage(record)?'질문과 답변 삭제':'작성자 또는 이 프로젝트의 관리자만 삭제할 수 있습니다.';remove.onclick=()=>deleteHistory([record.id]);row.append(check,button,remove);area.append(row);
     });
     const more=modal.querySelector('[data-qa-history-more]');more.hidden=list.length<=historyLimit;more.textContent=`더 보기 (${Math.max(0,list.length-historyLimit)}개 남음)`;visibilityControls();
   }
   async function setVisibility(shared){
-    if(busy||!selectedHistory.size)return;const id=project,chosen=historyRecords.filter(record=>selectedHistory.has(record.id));busy=true;controls();
+    if(busy||!selectedHistory.size)return;const id=project,chosen=historyRecords.filter(record=>selectedHistory.has(record.id)&&(!shared||record.visibility!=='shared'));if(!chosen.length)return;busy=true;controls();
     try{
       if(shared&&!window.ReqlyShared?.enabled)throw new Error('프로젝트 메뉴에서 공유 프로젝트를 먼저 열어 주세요.');
-      if(id!==window.ReqlyApp.projectId)throw new Error('프로젝트가 변경되었습니다.');await store.save(id,chosen);
+      if(id!==window.ReqlyApp.projectId)throw new Error('프로젝트가 변경되었습니다.');if(!shared&&!chosen.every(canManage))throw new Error('작성자 또는 이 프로젝트의 관리자만 공유를 해제할 수 있습니다.');await store.save(id,chosen);const identity=await store.owner(id);
       const add=shared?chosen:[],remove=shared?[]:chosen.filter(record=>record.visibility==='shared').map(record=>record.id);
-      if(add.length||remove.length)await window.ReqlyApp.updateProjectQuestions(add,remove,id);
+      if(add.length||remove.length)await window.ReqlyApp.updateProjectQuestions(add,remove,id,identity.authorSecret);
       selectedHistory.clear();await renderHistory();message(shared?'선택한 답변을 프로젝트에 공유했습니다. 프로젝트 URL과 비밀번호로 접속한 분들이 읽을 수 있습니다.':'선택한 답변을 나만 보기로 저장했습니다. 이미 다른 사람이 보관한 사본은 회수되지 않습니다.');
     }catch(error){message(`공개 범위를 변경하지 못했습니다: ${error.message}`);}finally{busy=false;controls();}
+  }
+  async function deleteHistory(ids){
+    if(busy)return;const id=project,chosen=historyRecords.filter(record=>ids.includes(record.id));if(!chosen.length)return;
+    if(!chosen.every(canManage)){message('작성자 또는 이 프로젝트의 관리자만 삭제할 수 있습니다.');return;}
+    const shared=chosen.filter(record=>record.visibility==='shared'),description=`선택한 질문과 답변 ${chosen.length}개를 삭제할까요?${shared.length?' 프로젝트에 공유한 답변은 함께 보는 목록에서도 삭제됩니다.':''}`;
+    busy=true;controls();
+    try{
+      const confirmed=await(window.ReqlyDesign?.confirm('질의응답 삭제',description)??window.confirm(description));if(!confirmed)return;
+      if(id!==window.ReqlyApp.projectId)throw new Error('프로젝트가 변경되었습니다.');
+      if(shared.length){const identity=await store.owner(id);await window.ReqlyApp.deleteProjectQuestions(shared.map(record=>record.id),id,identity.authorSecret);}
+      await store.remove(id,chosen.map(record=>record.id));selectedHistory.clear();answers.clear();result.replaceChildren();await renderHistory();message('선택한 질문과 답변을 삭제했습니다.');
+    }catch(error){message(`질의응답을 삭제하지 못했습니다: ${error.message}`);}finally{busy=false;controls();}
   }
   function historyRecord(answer,question,model,signature,contextQuestion){
     return{id:crypto.randomUUID(),question,contextQuestion,signature,model,createdAt:new Date().toISOString(),scope:scope.textContent,answer:{status:answer.status,followUp:answer.followUp,rejected:answer.rejected,claims:answer.claims.map(claim=>({text:claim.text,evidence:claim.evidence.map(evidence=>({sourceId:evidence.sourceId,filename:evidence.filename,page:evidence.page,sheet:evidence.sheet,title:evidence.title,requirementKey:evidence.requirementKey,assetId:evidence.assetId,kind:evidence.kind,location:evidence.location,quote:evidence.quote}))}))}};
@@ -114,15 +128,15 @@
   }
   function open(question=''){
     const id=window.ReqlyApp.projectId;if(busy&&id!==project){stopped=true;return;}
-    if(project!==id){project=id;previousQuestion='';previousContext='';pendingRecord=null;selectedHistory.clear();historyLimit=8;result.replaceChildren();scope.textContent='';message('프로젝트 문서를 근거로 답합니다.');}
+    if(project!==id){project=id;author=null;previousQuestion='';previousContext='';pendingRecord=null;selectedHistory.clear();historyLimit=8;result.replaceChildren();scope.textContent='';message('프로젝트 문서를 근거로 답합니다.');}
     if(question)input.value=question;renderHistory();controls();modal.classList.add('open');if(!busy)input.focus();
   }
   document.addEventListener('DOMContentLoaded',()=>{
     modal=node('div',undefined,'pages-modal');modal.innerHTML=`<section class="pages-dialog project-qa-dialog" role="dialog" aria-modal="true" aria-label="프로젝트 AI 질문"><header><div><h2>프로젝트 AI 질문</h2><p>관련 원문을 찾아 답하고 근거를 함께 보여드립니다.</p></div><button type="button" class="pages-close" aria-label="프로젝트 AI 질문 닫기">×</button></header><div class="pages-body"><details class="qa-history" open><summary>질의응답 히스토리 <span data-qa-history-count></span></summary><input data-qa-history-search type="search" placeholder="저장된 질문·답변 검색" aria-label="질의응답 히스토리 검색"><div data-qa-history-list></div><button class="pages-action" type="button" data-qa-history-more hidden>더 보기</button></details><form data-qa-form><label class="pages-field"><span>이 프로젝트에 궁금한 점</span><textarea rows="2" maxlength="1500" data-qa-question placeholder="예: 인력 프로필은 전원 제출인가요, PL급만 제출인가요?"></textarea></label><div class="qa-actions"><button class="pages-action primary" type="submit" data-qa-ask>근거 찾아 답변</button><button class="pages-action" type="button" data-qa-settings>AI 연결 설정</button><button class="pages-action" type="button" data-qa-stop hidden>중단 요청</button></div></form><p data-qa-scope class="qa-scope"></p><p role="status" data-qa-status></p><button class="pages-action" type="button" data-qa-save hidden>히스토리 저장 다시 시도</button><div data-qa-result></div><button class="pages-action" type="button" data-qa-expand hidden>AI로 검색어를 넓혀 다시 찾기 · 추가 요청</button><p class="qa-cost-note">새 질문에 답변을 생성할 때 질문한 사람의 AI 연결을 사용합니다. 저장된 히스토리는 AI 연결 없이 함께 읽을 수 있습니다.</p></div></section>`;document.body.append(modal);
     input=modal.querySelector('[data-qa-question]');status=modal.querySelector('[data-qa-status]');scope=modal.querySelector('[data-qa-scope]');result=modal.querySelector('[data-qa-result]');
-    const tools=node('div',undefined,'qa-visibility-tools');tools.innerHTML='<span data-qa-selected>0개 선택</span><button type="button" class="pages-action" data-qa-private disabled>나만 보기</button><button type="button" class="pages-action" data-qa-share disabled>프로젝트 공유</button>';modal.querySelector('[data-qa-history-list]').before(tools);
+    const tools=node('div',undefined,'qa-visibility-tools');tools.innerHTML='<span data-qa-selected>0개 선택</span><button type="button" class="pages-action" data-qa-private disabled>나만 보기</button><button type="button" class="pages-action" data-qa-share disabled>프로젝트 공유</button><button type="button" class="pages-action danger" data-qa-delete disabled>선택 삭제</button>';modal.querySelector('[data-qa-history-list]').before(tools);
     const note=node('p','새 답변은 나만 보기로 저장됩니다. 나만 보기는 현재 브라우저 기준이며, 프로젝트 공유 답변은 URL과 프로젝트 비밀번호로 접속한 분들이 함께 읽습니다.','qa-model');tools.before(note);
-    modal.querySelector('[data-qa-private]').onclick=()=>setVisibility(false);modal.querySelector('[data-qa-share]').onclick=()=>setVisibility(true);
+    modal.querySelector('[data-qa-private]').onclick=()=>setVisibility(false);modal.querySelector('[data-qa-share]').onclick=()=>setVisibility(true);modal.querySelector('[data-qa-delete]').onclick=()=>deleteHistory([...selectedHistory]);
     modal.querySelector('[data-qa-form]').onsubmit=event=>{event.preventDefault();ask();};
     modal.querySelector('[data-qa-expand]').onclick=()=>ask(true);
     modal.querySelector('[data-qa-save]').onclick=async()=>{if(busy||!pendingRecord)return;busy=true;controls();try{await persist(pendingRecord,project);}finally{busy=false;controls();}};

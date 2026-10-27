@@ -15,7 +15,8 @@ function doGet(e) {
 
 function reqlyRpc(request) {
   try {
-    const actions = ['challenge', 'create', 'login', 'load', 'save', 'password', 'upload', 'download', 'removeFile', 'selectRfp', 'deleteProject', 'renameProject'];
+    const actions = ['challenge', 'create', 'login', 'load', 'save', 'password', 'upload', 'download', 'removeFile', 'selectRfp', 'deleteProject', 'renameProject',
+      'directoryChallenge', 'directorySetupChallenge', 'directorySetup', 'directoryLogin', 'directoryList', 'directoryChangePassword', 'qaPublish', 'qaUnpublish', 'qaDelete'];
     if (!request || !actions.includes(request.action)) throw new Error('지원하지 않는 요청입니다.');
     const lock = LockService.getScriptLock();
     lock.waitLock(25000);
@@ -40,6 +41,22 @@ function initializeStorage() {
   if (!owner || Session.getActiveUser().getEmail() !== owner) throw new Error('프로그램 소유자만 초기화할 수 있습니다.');
   setup_();
   return { ready: true };
+}
+
+// Run only from the owner's editor. A public visitor cannot claim an unset directory.
+function prepareDirectorySetup() {
+  const owner = Session.getEffectiveUser().getEmail();
+  if (!owner || Session.getActiveUser().getEmail() !== owner) throw new Error('프로그램 소유자만 목록 관리자 설정을 준비할 수 있습니다.');
+  const lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try {
+    settings_();
+    if (directoryAccess_()) fail_('DIRECTORY_CONFIGURED', '전체 목록 관리자 비밀번호가 이미 설정되어 있습니다.');
+    const setupToken = random_(), expiresAt = Date.now() + 30 * 60000;
+    PropertiesService.getScriptProperties().setProperty('DIRECTORY_SETUP', JSON.stringify({ hash: digest_(setupToken), expiresAt: expiresAt }));
+    const url = 'https://sjk3446.github.io/rfp/#directory-setup=' + setupToken;
+    console.log('목록 관리자 비밀번호 설정 (30분 이내 1회 사용): ' + url);
+    return { url: url, expiresAt: expiresAt };
+  } finally { lock.releaseLock(); }
 }
 
 // Internal helper, never exposed by RPC.
@@ -96,7 +113,55 @@ function authorize_(record, token, admin) {
 }
 function public_(data) {
   return { id: data.id, name: data.name, version: data.version, updatedAt: data.updatedAt,
-    workspace: { projectId: data.id, document: data.document, references: data.references, requirements: Object.values(data.items), assets: data.assets.map(file=>{const value=Object.assign({},file);delete value.driveId;return value;}), selectedRfp: data.selectedRfp } };
+    workspace: { projectId: data.id, document: data.document, references: data.references, requirements: Object.values(data.items), assets: data.assets.map(file=>{const value=Object.assign({},file);delete value.driveId;return value;}), selectedRfp: data.selectedRfp, questionDeletedIds: Object.keys(data.qaDeleted || {}) } };
+}
+
+function questionKey_(value) {
+  if (typeof value !== 'string' || !/^[\w-]{1,160}$/.test(value) || ['__proto__', 'constructor', 'prototype'].includes(value)) throw new Error('질의응답 식별자가 올바르지 않습니다.');
+  return value;
+}
+function questionOwner_(data, secret) {
+  if (typeof secret !== 'string' || !/^[a-f0-9]{64}$/.test(secret)) return null;
+  return { hash: mac_('question-owner:' + data.id + ':' + secret), authorId: digest_('question-author:' + data.id + ':' + secret).replace(/=+$/, '') };
+}
+function questionMutation_(record, role, r) {
+  const data = record.data, history = Array.isArray(data.document?.qaHistory) ? data.document.qaHistory : [];
+  const owners = data.qaOwners || {}, deleted = data.qaDeleted || {}, owner = questionOwner_(data, r.authorSecret);
+  const publishing = r.action === 'qaPublish', entries = publishing ? r.records : r.questionIds;
+  if (!Array.isArray(entries) || !entries.length || entries.length > 100 || JSON.stringify(entries).length > 2000000) throw new Error('한 번에 변경할 질의응답은 1~100개로 선택해 주세요.');
+  const ids = entries.map(entry => questionKey_(publishing ? entry?.id : entry));
+  if (new Set(ids).size !== ids.length) throw new Error('중복된 질의응답을 확인해 주세요.');
+  const records = new Map(history.map(entry => [entry.id, entry]));
+  // Validate the entire batch before writes. Existing legacy entries cannot acquire ownership by republication.
+  entries.forEach((entry, index) => {
+    const id = ids[index], owned = owner && owners[id] && equal_(owners[id], owner.hash);
+    if (publishing) {
+      if (!owner) fail_('FORBIDDEN', '이 브라우저의 질문 작성자 정보를 확인해 주세요.');
+      if (deleted[id]) fail_('QA_DELETED', '이미 삭제한 질의응답은 다시 공유할 수 없습니다.');
+      if ((records.has(id) || owners[id]) && !owned) fail_('FORBIDDEN', '다른 작성자의 질의응답은 변경할 수 없습니다.');
+      if (typeof entry.question !== 'string' || !entry.question.trim() || !Array.isArray(entry.answer?.claims)) throw new Error('질의응답 저장 내용을 확인해 주세요.');
+    } else if (role !== 'admin' && !owned) fail_('FORBIDDEN', '작성자 또는 이 프로젝트의 관리자만 질의응답을 삭제하거나 공유를 해제할 수 있습니다.');
+    if (!publishing && !records.has(id) && !owners[id] && !deleted[id]) fail_('NOT_FOUND', '질의응답을 찾을 수 없습니다.');
+  });
+  let changed = false;
+  entries.forEach((entry, index) => {
+    const id = ids[index];
+    if (publishing) {
+      const clean = {};
+      ['id', 'question', 'contextQuestion', 'signature', 'model', 'createdAt', 'scope', 'answer'].forEach(key => { if (entry[key] !== undefined) clean[key] = entry[key]; });
+      clean.authorId = owner.authorId;
+      if (JSON.stringify(records.get(id)) !== JSON.stringify(clean)) { records.set(id, clean); changed = true; }
+      owners[id] = owner.hash;
+    } else {
+      if (records.delete(id)) changed = true;
+      if (r.action === 'qaDelete' && !deleted[id]) { deleted[id] = new Date().toISOString(); changed = true; }
+    }
+  });
+  if (changed) {
+    data.document = Object.assign({}, data.document || { name: data.name, type: 'PROJECT' }, { qaHistory: Array.from(records.values()) });
+    data.qaOwners = owners; data.qaDeleted = deleted; data.version += 1; data.updatedAt = new Date().toISOString(); write_(record);
+  }
+  return { project: public_(data) };
 }
 
 function loginRole_(record, proof) {
@@ -113,7 +178,109 @@ function loginRole_(record, proof) {
   return role;
 }
 
+function directoryAccess_() {
+  const raw = PropertiesService.getScriptProperties().getProperty('DIRECTORY_ACCESS');
+  if (!raw) return null;
+  const access = JSON.parse(raw);
+  if (!/^[a-f0-9]{64}$/.test(access.salt || '') || !access.hash || !access.epoch) throw new Error('전체 목록 관리자 설정을 확인해 주세요.');
+  return access;
+}
+function directorySaveAccess_(access) {
+  PropertiesService.getScriptProperties().setProperty('DIRECTORY_ACCESS', JSON.stringify(access));
+}
+function directoryProofHash_(proof) { return mac_('directory-password:' + proof_(proof)); }
+function directorySign_(purpose, claim) {
+  const body = Utilities.base64EncodeWebSafe(JSON.stringify(claim), Utilities.Charset.UTF_8);
+  return body + '.' + mac_('directory:' + purpose + ':' + body);
+}
+function directoryReadSigned_(purpose, token, code) {
+  const parts = typeof token === 'string' && token.length < 20000 ? token.split('.') : [];
+  if (parts.length !== 2 || !equal_(parts[1], mac_('directory:' + purpose + ':' + parts[0]))) fail_(code, '전체 목록 관리자 비밀번호로 다시 접속해 주세요.');
+  let claim;
+  try { claim = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString('UTF-8')); }
+  catch (_) { fail_(code, '전체 목록 접속 정보가 올바르지 않습니다.'); }
+  if (!claim || claim.purpose !== purpose || !Number.isFinite(claim.expiresAt) || claim.expiresAt <= Date.now()) fail_(code, '전체 목록 접속 시간이 만료되었습니다. 다시 접속해 주세요.');
+  return claim;
+}
+function directorySession_(access) {
+  const expiresAt = Date.now() + 12 * 60 * 60000;
+  return { directoryToken: directorySign_('session', { purpose: 'session', epoch: access.epoch, nonce: random_(), expiresAt: expiresAt }), expiresAt: expiresAt };
+}
+function directoryAuthorize_(token, access) {
+  if (!access) fail_('DIRECTORY_UNCONFIGURED', '전체 목록 관리자 비밀번호 설정이 필요합니다.');
+  const claim = directoryReadSigned_('session', token, 'DIRECTORY_AUTH');
+  if (claim.epoch !== access.epoch) fail_('DIRECTORY_AUTH', '전체 목록 관리자 비밀번호가 변경되었습니다. 다시 접속해 주세요.');
+  return claim;
+}
+function directoryCheckProof_(access, proof) {
+  const failures = access.failures || { count: 0, until: 0 };
+  if (failures.until > Date.now()) fail_('RATE_LIMIT', '잠시 후 다시 접속해 주세요.');
+  const valid = typeof proof === 'string' && /^[a-f0-9]{64}$/.test(proof) && equal_(access.hash, directoryProofHash_(proof));
+  if (!valid) {
+    failures.count += 1;
+    access.failures = failures.count >= 20 ? { count: 0, until: Date.now() + 60000 } : failures;
+    directorySaveAccess_(access); fail_('DIRECTORY_AUTH', '전체 목록 관리자 비밀번호가 올바르지 않습니다.');
+  }
+  access.failures = { count: 0, until: 0 }; directorySaveAccess_(access);
+}
+function directorySetupCheck_(setupToken) {
+  if (directoryAccess_()) fail_('DIRECTORY_CONFIGURED', '전체 목록 관리자 비밀번호가 이미 설정되어 있습니다.');
+  const raw = PropertiesService.getScriptProperties().getProperty('DIRECTORY_SETUP');
+  let setup; try { setup = raw ? JSON.parse(raw) : null; } catch (_) { setup = null; }
+  if (typeof setupToken !== 'string' || !/^[a-f0-9]{64}$/.test(setupToken) || !setup || setup.expiresAt <= Date.now() || !equal_(setup.hash, digest_(setupToken)))
+    fail_('DIRECTORY_SETUP_INVALID', '목록 관리자 설정 링크가 올바르지 않거나 만료되었습니다. 소유자에게 확인해 주세요.');
+}
+function directoryList_(r, access) {
+  const session = directoryAuthorize_(r.directoryToken, access), root = settings_().root;
+  let folders;
+  if (r.cursor) {
+    const cursor = directoryReadSigned_('page', r.cursor, 'DIRECTORY_CURSOR');
+    if (cursor.epoch !== access.epoch || cursor.root !== root.getId() || typeof cursor.continuation !== 'string') fail_('DIRECTORY_CURSOR', '목록을 처음부터 다시 불러와 주세요.');
+    try { folders = DriveApp.continueFolderIterator(cursor.continuation); }
+    catch (_) { fail_('DIRECTORY_CURSOR', '목록을 처음부터 다시 불러와 주세요.'); }
+  } else folders = root.getFolders();
+  const projects = []; let scanned = 0, read = 0, skipped = 0;
+  // Bound both JSON reads and unrelated folder scans. The caller follows nextCursor.
+  while (folders.hasNext() && projects.length < 20 && read < 20 && scanned < 40) {
+    const folder = folders.next(); scanned += 1;
+    if (folder.isTrashed() || !/^[a-f0-9]{64}$/.test(folder.getName())) continue;
+    try {
+      const files = folder.getFilesByName('project.json');
+      if (!files.hasNext()) { skipped += 1; continue; }
+      read += 1;
+      const data = JSON.parse(files.next().getBlob().getDataAsString('UTF-8'));
+      if (data.id !== folder.getName() || typeof data.name !== 'string' || !data.auth || !data.items) { skipped += 1; continue; }
+      projects.push({ id: data.id, name: data.name, updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : '' });
+    } catch (_) { skipped += 1; }
+  }
+  const nextCursor = folders.hasNext() ? directorySign_('page', { purpose: 'page', epoch: access.epoch, root: root.getId(), continuation: folders.getContinuationToken(), expiresAt: Math.min(session.expiresAt, Date.now() + 30 * 60000) }) : '';
+  return { projects: projects, nextCursor: nextCursor, skipped: skipped };
+}
+function directoryDispatch_(r) {
+  const access = directoryAccess_();
+  if (r.action === 'directoryChallenge') return access ? { configured: true, salt: access.salt, iterations: 600000 } : { configured: false };
+  if (r.action === 'directorySetupChallenge') { directorySetupCheck_(r.setupToken); return { ready: true }; }
+  if (r.action === 'directorySetup') {
+    directorySetupCheck_(r.setupToken);
+    if (!/^[a-f0-9]{64}$/.test(r.salt || '')) throw new Error('목록 관리자 비밀번호 설정을 다시 진행해 주세요.');
+    const next = { salt: r.salt, hash: directoryProofHash_(r.proof), epoch: random_(), failures: { count: 0, until: 0 } };
+    directorySaveAccess_(next);
+    PropertiesService.getScriptProperties().deleteProperty('DIRECTORY_SETUP');
+    return directorySession_(next);
+  }
+  if (!access) fail_('DIRECTORY_UNCONFIGURED', '전체 목록 관리자 비밀번호 설정이 필요합니다.');
+  if (r.action === 'directoryLogin') { directoryCheckProof_(access, r.proof); return directorySession_(access); }
+  if (r.action === 'directoryList') return directoryList_(r, access);
+  if (r.action === 'directoryChangePassword') {
+    directoryAuthorize_(r.directoryToken, access); directoryCheckProof_(access, r.currentProof);
+    access.hash = directoryProofHash_(r.newProof); access.epoch = random_(); directorySaveAccess_(access);
+    return directorySession_(access);
+  }
+  throw new Error('지원하지 않는 요청입니다.');
+}
+
 function dispatch_(r) {
+  if (r.action.indexOf('directory') === 0) return directoryDispatch_(r);
   if (r.action === 'create') {
     if (!String(r.name || '').trim()) throw new Error('프로젝트 이름을 입력해 주세요.');
     // Same salt permits checking that the two passwords differ without receiving them.
@@ -153,6 +320,7 @@ function dispatch_(r) {
     return { project: public_(data) };
   }
   const role = authorize_(record, r.token, ['password', 'removeFile'].includes(r.action));
+  if (['qaPublish', 'qaUnpublish', 'qaDelete'].includes(r.action)) return questionMutation_(record, role, r);
   if (r.action === 'load') {
     if (r.version === data.version) return { unchanged: true, version: data.version };
     return { project: public_(data), role: role };
@@ -171,7 +339,11 @@ function dispatch_(r) {
     });
     const savedAt = new Date().toISOString();
     if (r.metadata) {
-      data.document = r.metadata.document || null;
+      const history = data.document?.qaHistory;
+      data.document = r.metadata.document ? Object.assign({}, r.metadata.document) : null;
+      // Shared history is writable only through the permission-checked question RPCs.
+      if (data.document) delete data.document.qaHistory;
+      if (Array.isArray(history)) data.document = Object.assign({}, data.document || { name: data.name, type: 'PROJECT' }, { qaHistory: history });
       data.references = Array.isArray(r.metadata.references) ? r.metadata.references : data.references;
     }
     changes.forEach(change => {

@@ -8,7 +8,7 @@ function client(address,endpoint='https://script.google.com/macros/s/example/exe
   const listeners={},sent=[];let nonce;
   const origin='https://n-example-script.googleusercontent.com';
   const peer={postMessage(message,target){sent.push({message,target});Promise.resolve().then(()=>respond?respond(message.request):{ok:true,value:{project:{id:'a'.repeat(64),version:0,workspace:{requirements:[]}},role:'user'}}).then(result=>listeners.message({origin,source:peer,data:{channel:'reqly-drive-v1',nonce,requestId:message.requestId,result}}));}};
-  const context={URL,URLSearchParams,crypto:webcrypto,TextEncoder,Uint8Array,CustomEvent,setTimeout,clearTimeout,setInterval,clearInterval,Map,location:new URL(address),document:{hidden:false,createElement(){return{};},body:{appendChild(frame){nonce=new URL(frame.src).searchParams.get('channel');queueMicrotask(()=>{
+  const context={File,atob,URL,URLSearchParams,crypto:webcrypto,TextEncoder,Uint8Array,CustomEvent,setTimeout,clearTimeout,setInterval,clearInterval,Map,location:new URL(address),document:{hidden:false,createElement(){return{};},body:{appendChild(frame){nonce=new URL(frame.src).searchParams.get('channel');queueMicrotask(()=>{
     listeners.message({origin:'https://evil.example',source:{},data:{channel:'reqly-drive-v1',nonce,ready:true}});
     listeners.message({origin,source:peer,data:{channel:'reqly-drive-v1',nonce,ready:true}});
   });}}},window:{REQLY_CLOUD:{endpoint},ReqlySharedCore:require('../shared-core.js'),addEventListener(name,handler){listeners[name]=handler;},dispatchEvent(){}}};
@@ -77,4 +77,35 @@ test('an unknown stale draft is not silently assigned a fresh revision',async()=
   const store=mockStore(),c=connectStore(store.respond);await c.api.refresh();
   await assert.rejects(c.api.saveItems([{...c.api.project.workspace.requirements[0],revision:0,name:'stale'}]),/겹칩니다/);
   assert.equal(c.sent.filter(x=>x.message.request.action==='save').length,0);
+});
+
+
+test('repeated and concurrent original reads share one download; failures retry and disconnect clears cache',async()=>{
+  let downloads=0,fail=false;
+  const c=client('https://sjk3446.github.io/rfp/',undefined,request=>{
+    if(request.action==='load')return{ok:true,value:{token:'project-session',project:{id:'a'.repeat(64),version:1,workspace:{requirements:[]}}}};
+    if(request.action==='download'){downloads++;return fail?{ok:false,error:'download failed'}:{ok:true,value:{name:'original.txt',base64:btoa('source bytes')}};}
+    throw new Error('unexpected');
+  });
+  await c.api.refresh();
+  const start=downloads,values=await Promise.all([c.api.download('file'),c.api.download('file'),c.api.download('file')]);
+  assert.equal(downloads-start,1);assert.equal(await values[0].text(),'source bytes');assert.equal(values[0],values[1]);
+  await c.api.download('file');assert.equal(downloads-start,1);
+  fail=true;await assert.rejects(()=>c.api.download('other'),/failed/);fail=false;await c.api.download('other');assert.equal(downloads,3);
+  c.api.disconnect();await assert.rejects(()=>c.api.download('file'),/다시 접속/);assert.equal(downloads,3);await c.api.refresh();await c.api.download('file');assert.equal(downloads,4);
+});
+test('a late original response cannot repopulate the cache after disconnect',async()=>{
+  let release,downloads=0;
+  const c=client('https://sjk3446.github.io/rfp/',undefined,request=>request.action==='load'?{ok:true,value:{token:'project-session',project:{id:'a'.repeat(64),version:1,workspace:{requirements:[]}}}}:new Promise(resolve=>{downloads++;release=()=>resolve({ok:true,value:{name:'source.txt',base64:btoa('source')}});}));
+  await c.api.refresh();const pending=c.api.download('file');await new Promise(resolve=>setImmediate(resolve));c.api.disconnect();release();await assert.rejects(pending,/변경/);assert.equal(downloads,1);
+});
+
+test('known expired project access clears originals and rejects cached downloads',async()=>{
+  let revoked=false,downloads=0;
+  const c=client('https://sjk3446.github.io/rfp/',undefined,request=>{
+    if(revoked)return{ok:false,code:'AUTH',error:'session revoked'};
+    if(request.action==='load')return{ok:true,value:{token:'project-token',project:{id:'a'.repeat(64),version:1,workspace:{requirements:[]}}}};
+    downloads++;return{ok:true,value:{name:'original.txt',base64:btoa('original')}};
+  });
+  await c.api.refresh();await c.api.download('asset');revoked=true;await assert.rejects(()=>c.api.refresh(),/revoked/);await assert.rejects(()=>c.api.download('asset'),/다시 접속/);assert.equal(downloads,1);
 });

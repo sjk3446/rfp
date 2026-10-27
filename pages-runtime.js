@@ -433,7 +433,8 @@ if(path.endsWith('/api/export-questions')){await window.ReqlyParserLibraries.loa
       if(!currentProject||workspace.projectId!==currentProject.id)throw new Error('프로젝트가 변경되어 저장하지 못했습니다.');
       clearTimeout(saveTimer);
       const next={...currentProject,updatedAt:now(),workspace:structuredClone(workspace)};
-      await dbPut(next);currentProject=next;
+      await dbPut(next);
+      if(currentProject?.id===next.id)currentProject=next;
     }
   };
 })();

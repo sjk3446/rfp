@@ -130,3 +130,29 @@ test('project questions use grounded structured replies on all providers and exp
     }
   }
 });
+
+test('all providers support one structured RFP analysis containing both evidence-based result types',async()=>{
+  for(const [provider,model] of [['gemini','gemini-3.1-flash-lite'],['anthropic','claude-sonnet-5-5'],['openai','gpt-5-mini']]){
+    const text=JSON.stringify({requirements:[],overview:[]});
+    const data=provider==='gemini'?{candidates:[{finishReason:'STOP',content:{parts:[{text}]}}]}:provider==='anthropic'?{stop_reason:'end_turn',content:[{type:'text',text}]}:{status:'completed',output:[{content:[{type:'output_text',text}]}]};
+    const b=browser(new Map(),async()=>({ok:true,json:async()=>data}));await b.api.connect(provider,model,'dummy');
+    const result=await b.api.generate('rfpAnalysis',{requirementCategories:['기타'],overviewCategories:['사업기간'],units:[{sourceId:'s1',text:'사업기간은 12개월입니다.'}]});
+    assert.equal(result.requirements.length,0);assert.equal(result.overview.length,0);assert.equal(b.calls.length,1);
+    const body=JSON.parse(b.calls[0].options.body),instruction=body.system||body.instructions||body.systemInstruction.parts[0].text;
+    assert.match(instruction,/requirements/);assert.match(instruction,/overview/);assert.match(instruction,/임의의 요구사항 번호를 만들지/);
+    assert.equal(body.generationConfig?.maxOutputTokens||body.max_tokens||body.max_output_tokens,16384);
+    if(provider==='anthropic'){
+      const schema=body.output_config.format.schema;assert.deepEqual(schema.required,['requirements','overview']);assert.equal(schema.additionalProperties,false);
+      assert.ok(schema.properties.requirements.items.properties.id);assert.ok(schema.properties.overview.items.properties.content);
+    }
+  }
+});
+
+test('combined RFP replies require both arrays and propagate output limits for safe splitting',async()=>{
+  for(const text of ['{"requirements":[]}','{"overview":[]}','{"requirements":{},"overview":[]}','not JSON']){
+    const b=browser(new Map(),async()=>({ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text}]}}]})}));await b.api.connect('gemini','gemini-3.1-flash-lite','dummy');
+    await assert.rejects(b.api.generate('rfpAnalysis',{}),{code:'INVALID_JSON'});
+  }
+  const b=browser(new Map(),async()=>({ok:true,json:async()=>({stop_reason:'max_tokens',content:[{type:'text',text:'{"requirements":[]'}]})}));await b.api.connect('anthropic','claude-sonnet-5-5','dummy');
+  await assert.rejects(b.api.generate('rfpAnalysis',{}),{code:'OUTPUT_LIMIT'});assert.equal(b.calls.length,1);
+});

@@ -64,6 +64,7 @@
     const idle=element('section','editor-idle');idle.id='editorIdle';idle.innerHTML='<h2>검토할 요구사항을 선택하세요</h2><p>목록에서 항목을 선택하면 이곳에서 원문을 읽고 검토 상태, 질의사항과 적용 방안을 함께 편집할 수 있습니다.</p>';
     const create=button('요구사항 직접 추가','button primary');create.onclick=()=>byId('addButton').click();idle.append(create);
     editor.append(idle,byId('detailDrawer'));workbench.append(list,editor);card.append(workbench);
+    window.ReqlyWorkbenchResize?.mount(workbench,list,editor);
     const full=button('전체 표 보기');full.id='listViewToggle';document.querySelector('.card-actions').prepend(full);
     full.onclick=()=>{const on=card.classList.toggle('full-list');full.textContent=on?'목록·편집 보기':'전체 표 보기';more.open=false;window.ReqlyApp?.refreshList();};
     byId('compactSelectAll').onchange=event=>{byId('selectAll').checked=event.target.checked;byId('selectAll').dispatchEvent(new Event('change',{bubbles:true}));};

@@ -1,7 +1,7 @@
 /* Originals are kept separately from requirement edits and JSON backups. */
 (() => {
   'use strict';
-  let database, modal, settingsModal, settingsPanel, currentId='', working=false, switching=false;
+  let database, modal, settingsModal, settingsPanel, directoryView, currentId='', working=false, switching=false;
   const shared=()=>!!window.ReqlyShared?.enabled;
   function db(){return database||=(new Promise((resolve,reject)=>{const r=indexedDB.open('reqly-original-files',1);r.onupgradeneeded=()=>r.result.createObjectStore('files',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);}));}
   async function operation(mode,fn){const d=await db();return new Promise((resolve,reject)=>{const tx=d.transaction('files',mode),r=fn(tx.objectStore('files'));r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
@@ -50,26 +50,24 @@
     const section=settingsPanel.querySelector('[data-known-projects]');
     section.hidden=!window.ReqlyShared?.available;
     const area=section.querySelector('[data-shared-project-list]');area.replaceChildren();
-    const projects=window.ReqlyShared?.knownProjects?.()||[];
-    if(!projects.length)area.append(node('p','아직 기록된 공유 프로젝트가 없습니다. 아래에 기존 공유 링크를 붙여 넣어 열 수 있습니다.','fm-empty'));
-    for(const project of projects){
-      const row=node('article',undefined,'shared-project-row'),info=node('div'),name=node('h4',project.name);
-      const current=shared()&&project.id===window.ReqlyShared.project.id;
-      const date=new Date(project.updatedAt),stamp=Number.isNaN(date.getTime())?'마지막 저장일 확인 전':`마지막 확인한 저장: ${date.toLocaleString('ko-KR')}`;
-      info.append(name,node('p',stamp));row.append(info);
-      const actions=window.ReqlyProjectPicker.actions(project,{current,onOpen:()=>navigateProject(window.ReqlyProjectDirectory.projectUrl(location.href,project.id)),onRename:async()=>{
-        try{if(await window.ReqlyShared.renameProject(project)){renderSettings();settingsNotice('프로젝트 이름을 변경했습니다.');}}
-        catch(error){settingsNotice(error.message);}
-      },onDelete:async()=>{
-        try{
-          if(current&&window.ReqlyApp?.confirmLeave&&!(await window.ReqlyApp.confirmLeave()))return;
-          if(!(await window.ReqlyShared.deleteProject(project)))return;
-          if(current){const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('mode','shared');window.ReqlyApp?.allowNavigation?.();location.href=url.href;}
-          else{renderProjectList();settingsNotice(`‘${project.name}’ 프로젝트를 삭제했습니다.`);}
-        }catch(error){settingsNotice(error.message);}
-      }});
-      row.append(actions);area.append(row);
+    directoryView?.destroy();
+    const current=shared()?window.ReqlyShared.project:null;
+    const rename=async project=>{const changed=await window.ReqlyShared.renameProject(project);if(changed){renderSettings();settingsNotice('프로젝트 이름을 변경했습니다.');}return changed;};
+    const remove=async project=>{
+      const isCurrent=current?.id===project.id;
+      if(isCurrent&&window.ReqlyApp?.confirmLeave&&!(await window.ReqlyApp.confirmLeave()))return false;
+      if(!(await window.ReqlyShared.deleteProject(project)))return false;
+      if(isCurrent){const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('mode','shared');window.ReqlyApp?.allowNavigation?.();location.href=url.href;}
+      else{renderProjectList();settingsNotice('프로젝트를 삭제했습니다.');}
+      return true;
+    };
+    // A project password still grants its own controls without opening the directory.
+    if(current){
+      const own=node('div',undefined,'directory-current-project');own.append(node('h4','현재 프로젝트'),node('p',current.name));
+      own.append(window.ReqlyProjectPicker.actions(current,{current:true,onRename:async()=>{try{await rename(current);}catch(error){settingsNotice(error.message);}},onDelete:async()=>{try{await remove(current);}catch(error){settingsNotice(error.message);}}}));area.append(own);
     }
+    directoryView=window.ReqlyProjectPicker.directoryPanel({currentId:current?.id||'',onOpen:project=>navigateProject(window.ReqlyProjectDirectory.projectUrl(location.href,project.id)),onRename:rename,onDelete:remove});
+    area.append(directoryView.element);
   }
   function renderSettings(){
     const role=shared()?window.ReqlyShared.role:'';
@@ -126,11 +124,11 @@
       <div class="pages-body"><p data-message role="status" class="fm-notice"></p>
       <div role="tabpanel" id="fm-documents" aria-labelledby="fm-documents-tab" data-file-panel="documents">
         <section class="fm-section"><div class="fm-section-heading"><div><h3>제안요청서 <span data-count="rfp"></span></h3><p>버전이 다른 RFP도 함께 보관할 수 있습니다.</p></div><button type="button" class="fm-action fm-action-primary" data-rfp>+ RFP 추가</button></div>
-        <details class="fm-help"><summary>기본 RFP 지정과 분석 방식 안내</summary><p><strong>기본 RFP로 지정</strong> 기본으로 사용할 문서만 바꿉니다. 요구사항을 추출하지 않습니다.</p><p><strong>규칙 기반 추출</strong> ID·표·요구 문장을 기준으로 추출하며 AI를 호출하지 않습니다.</p><p><strong>AI 요구사항 추출</strong> ID가 없거나 서술형인 문서에 사용합니다. API 연결 후 후보와 원문을 검토하고 선택한 항목을 추가합니다. 기존 작성 내용은 유지됩니다.</p><p>사업개요·기간·일정의 AI 분석은 상단 메뉴의 ‘사업 정보’에서 실행합니다.</p></details><div data-files="rfp"></div></section>
+        <details class="fm-help"><summary>기본 RFP 지정과 분석 방식 안내</summary><p><strong>기본 RFP로 지정</strong> 기본으로 사용할 문서만 바꿉니다. 요구사항을 추출하지 않습니다.</p><p><strong>규칙 기반 추출</strong> ID·표·요구 문장을 기준으로 추출하며 AI를 호출하지 않습니다.</p><p><strong>AI 요구사항 추출</strong> ID가 없거나 서술형인 문서도 요구사항 후보와 사업정보를 한 번에 분석합니다. 저장된 통합 결과가 있으면 다시 분석하지 않습니다. 후보와 원문을 검토한 뒤 선택한 항목만 추가하며 기존 작성 내용은 유지됩니다.</p><p>사업개요·기간·일정은 상단 ‘사업 정보’에서 확인합니다. 두 메뉴는 같은 통합 분석 결과를 사용하며 어느 쪽에서든 분석을 시작할 수 있습니다.</p></details><div data-files="rfp"></div></section>
         <section class="fm-section"><div class="fm-section-heading"><div><h3>관련자료 <span data-count="reference"></span></h3><p>회의록·녹취록·참고자료를 한곳에서 관리합니다.</p></div><button type="button" class="fm-action" data-reference>+ 관련자료 추가</button></div><div data-files="reference"></div></section>
       </div>
       <div role="tabpanel" id="fm-settings" aria-labelledby="fm-settings-tab" data-file-panel="settings" hidden>
-        <section class="fm-setting" data-known-projects><h3>프로젝트 목록</h3><p>이 브라우저에서 만들거나 접속한 공유 프로젝트입니다. 다른 프로젝트를 열 때는 해당 비밀번호를 입력합니다.</p><div data-shared-project-list></div><form data-open-shared-form class="shared-project-link"><label class="pages-field"><span>기존 프로젝트 공유 링크</span><input type="url" data-open-shared-url required placeholder="https://…?project=…" aria-label="기존 프로젝트 공유 링크"></label><button type="submit" class="fm-action">링크로 열기</button></form></section>
+        <section class="fm-setting" data-known-projects><h3>프로젝트 목록</h3><p>전체 목록은 목록 관리자만 열 수 있습니다. 공유받은 프로젝트는 아래 링크로 바로 접속하세요.</p><div data-shared-project-list></div><form data-open-shared-form class="shared-project-link"><label class="pages-field"><span>기존 프로젝트 공유 링크</span><input type="url" data-open-shared-url required placeholder="https://…?project=…" aria-label="기존 프로젝트 공유 링크"></label><button type="submit" class="fm-action">링크로 열기</button></form></section>
         <section class="fm-setting"><h3>프로젝트 공유</h3><p data-share-intro></p><label class="pages-field"><span>공유 링크</span><input readonly data-project-url aria-label="프로젝트 공유 링크"></label><button type="button" class="fm-action fm-action-primary" data-share>공유 URL 복사</button><p class="fm-setting-note">관리자용 비밀번호는 프로젝트를 관리하는 사람만 사용해 주세요.</p></section>
         <section class="fm-setting"><h3>비밀번호 변경</h3><p data-password-note></p><button type="button" class="fm-action" data-password>비밀번호 변경</button></section>
         <section class="fm-setting"><h3>다른 프로젝트 시작</h3><p>현재 프로젝트와 별개의 새 공유 프로젝트를 만듭니다.</p><button type="button" class="fm-action" data-new>새 공유 프로젝트</button></section>

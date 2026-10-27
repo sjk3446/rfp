@@ -1372,7 +1372,7 @@ async function analyzeFiles(files, storedAssetId = '') {
     if(merged.unresolved.length){
       throw new Error(`ID 대응이 불명확한 항목 ${merged.unresolved.length}개가 있습니다. 기존 내용은 유지했습니다. 현재 버전에서는 ID를 확인한 뒤 다시 분석해 주세요.`);
     }
-    const documentInfo={...payload.document,demo:false,assetId,overviewByAsset:state.document?.overviewByAsset||{},qaHistory:state.document?.qaHistory||[]};
+    const documentInfo={...payload.document,demo:false,assetId,overviewByAsset:state.document?.overviewByAsset||{},rfpAnalysisByAsset:state.document?.rfpAnalysisByAsset||{},qaHistory:state.document?.qaHistory||[]};
     if(window.ReqlyShared?.enabled) await window.ReqlyShared.saveItems(merged.requirements,{document:documentInfo,references:state.references});
     state.document = documentInfo;
     state.requirements = (window.ReqlyShared?.enabled ? window.ReqlyShared.project.workspace.requirements : merged.requirements).map(normalizeRequirement);
@@ -1710,18 +1710,43 @@ window.ReqlyApp={get projectId(){return state.projectId;},get document(){return 
   setFlag:updateRequirementFlag,
   selectRequirement(key,checked){checked?state.selected.add(key):state.selected.delete(key);syncRequirementSelection();},
   stepRequirement(direction){const items=filteredRequirements();const index=items.findIndex(item=>item.key===state.editingKey);if(items.length)openDrawer(items[(index+direction+items.length)%items.length].key);},
-  async updateProjectQuestions(add,remove,projectId){
+  get deletedQuestionIds(){return window.ReqlyShared?.enabled?window.ReqlyShared.project?.workspace.questionDeletedIds||[]:[];},
+  async updateProjectQuestions(add,remove,projectId,authorSecret){
     if(!window.ReqlyShared?.enabled)throw new Error('프로젝트 공유는 공유 프로젝트에서 사용할 수 있습니다.');
+    if(projectId!==state.projectId)throw new Error('프로젝트가 변경되어 히스토리에 저장하지 못했습니다.');
     if(add.some(record=>!record?.id||!record.question||!Array.isArray(record.answer?.claims)))throw new Error('질의응답 저장 내용이 올바르지 않습니다.');
+    if(add.length){
+      const records=add.map(record=>{const clean=structuredClone(record);delete clean.visibility;return clean;});
+      await window.ReqlyShared.questionHistory('qaPublish',{records,authorSecret});
+    }
+    if(remove.length){
+      if(projectId!==state.projectId)throw new Error('프로젝트가 변경되었습니다.');
+      await window.ReqlyShared.questionHistory('qaUnpublish',{questionIds:remove,authorSecret});
+    }
+  },
+  async deleteProjectQuestions(questionIds,projectId,authorSecret){
+    if(!window.ReqlyShared?.enabled||projectId!==state.projectId)throw new Error('현재 공유 프로젝트를 확인해 주세요.');
+    await window.ReqlyShared.questionHistory('qaDelete',{questionIds,authorSecret});
+  },
+  async saveRfpAnalysis(assetId,snapshot,projectId,expectedSavedAt){
+    if(projectId!==state.projectId||snapshot?.projectId!==projectId||snapshot?.assetId!==assetId)throw new Error('프로젝트가 변경되어 분석 결과를 저장하지 않았습니다.');
+    window.ReqlyFiles.setProject(projectId);
+    const assets=await window.ReqlyFiles.list();
+    if(!assets.some(file=>file.id===assetId&&file.kind==='rfp'))throw new Error('해당 RFP 원본을 찾을 수 없습니다.');
     for(let attempt=0;attempt<2;attempt++){
-      if(projectId!==state.projectId)throw new Error('프로젝트가 변경되어 히스토리에 저장하지 못했습니다.');
-      if(!window.ReqlyShared?.enabled)throw new Error('공유 프로젝트 연결을 확인해 주세요.');
-      const history=(state.document?.qaHistory||[]).filter(record=>!remove.includes(record.id));
-      const records=new Map(history.map(record=>[record.id,record]));add.forEach(record=>{const clean=structuredClone(record);delete clean.visibility;records.set(clean.id,clean);});
-      const documentInfo={...(state.document||{name:window.ReqlyPortal?.project?.name||'프로젝트',type:'PROJECT'}),qaHistory:[...records.values()]};
+      if(projectId!==state.projectId)throw new Error('프로젝트가 변경되었습니다.');
+      if(window.ReqlyShared?.enabled&&!window.ReqlyShared.project?.workspace.assets?.some(file=>file.id===assetId&&file.kind==='rfp'))throw new Error('해당 RFP 원본이 삭제되었습니다.');
+      const existing=state.document?.rfpAnalysisByAsset?.[assetId];
+      if((existing?.savedAt||'')!==(expectedSavedAt||''))throw new Error('다른 분석 결과가 먼저 저장되었습니다. 최신 결과를 확인해 주세요.');
+      const result={...structuredClone(snapshot),savedAt:new Date().toISOString()};
+      const document={...(state.document||{name:snapshot.sourceName,type:snapshot.sourceType,size:snapshot.sourceSize,pages:snapshot.pages,characters:snapshot.characters}),rfpAnalysisByAsset:{...(state.document?.rfpAnalysisByAsset||{}),[assetId]:result}};
       if(window.ReqlyShared?.enabled){
-        try{await window.ReqlyShared.saveItems([],{document:documentInfo,references:state.references});return;}
+        try{await window.ReqlyShared.saveItems([],{document,references:state.references});return result;}
         catch(error){if(error.code==='CONFLICT'&&attempt===0){await window.ReqlyShared.refresh();continue;}throw error;}
+      }else{
+        await window.ReqlyPortal.saveNow({projectId,document,references:state.references,requirements:state.requirements});
+        if(projectId!==state.projectId)throw new Error('프로젝트가 변경되어 현재 화면에 분석 결과를 적용하지 않았습니다.');
+        state.document=document;return result;
       }
     }
   },
