@@ -74,7 +74,7 @@
         input.oninput=()=>{if(attempted)validate();};body.append(wrap);return input;
       });
       let remember;
-      if(options.remember!==undefined){const label=document.createElement('label');label.className='pages-field';remember=document.createElement('input');remember.type='checkbox';remember.checked=!!options.remember;remember.style.width='auto';const caption=document.createElement('span');caption.textContent='이 기기에서 관리자 접속 기억 (90일)';label.append(remember,caption);body.append(label);}
+      if(options.remember!==undefined){const label=document.createElement('label');label.className='pages-field';label.style.display='flex';label.style.alignItems='center';label.style.gap='10px';remember=document.createElement('input');remember.type='checkbox';remember.checked=!!options.remember;remember.style.width='18px';remember.style.height='18px';remember.style.minHeight='18px';remember.style.padding='0';remember.style.flexShrink='0';const caption=document.createElement('span');caption.textContent='이 기기에서 관리자 접속 기억 (90일)';label.append(remember,caption);body.append(label);}
       function validate(){
         inputs.forEach(input=>input.setAttribute('aria-invalid','false'));
         for(let i=0;i<labels.length;i++){
