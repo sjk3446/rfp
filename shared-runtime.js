@@ -19,21 +19,27 @@
   const directory=window.ReqlyProjectDirectory?.create(directoryStorage);
   const clone = value => JSON.parse(JSON.stringify(value));
   const directorySessionKey='reqly-directory-session-v1';
-  let directorySessionStorage, directorySession=null, directoryProjects=[], directoryLoad, directoryGeneration=0, directoryExpiry,directoryLoaded=false;
+  let directorySessionStorage, directorySession=null, directoryProjects=[], directoryLoad, directoryGeneration=0, directoryExpiry,directoryLoaded=false, directoryRemembered=false;
+  const rememberedSessionKey='reqly-directory-remembered-v1';
+  const deletedProjects=new Set();
   let setupNonce=/^#directory-setup=([a-f0-9]{64})$/.exec(location.hash)?.[1]||'';
   if(setupNonce){const cleanUrl=new URL(location.href);cleanUrl.hash='';history.replaceState(null,'',cleanUrl);}
   try{directorySessionStorage=window.sessionStorage;const stored=JSON.parse(directorySessionStorage?.getItem(directorySessionKey)||'null');if(stored?.endpoint===endpoint&&stored.expiresAt>Date.now()&&typeof stored.directoryToken==='string')directorySession=stored;}catch(_){}
+  try{const stored=JSON.parse(directoryStorage?.getItem(rememberedSessionKey)||'null');if(stored?.endpoint===endpoint&&stored.expiresAt>Date.now()&&typeof stored.directoryToken==='string'){directorySession=stored;directoryRemembered=true;}}catch(_){}
   const directoryUnlocked=()=>!!directorySession&&directorySession.expiresAt>Date.now();
   function directoryChanged(message=''){window.dispatchEvent(new CustomEvent('reqly-directory-update',{detail:{message}}));}
   function lockDirectory(message=''){
     directoryGeneration++;directorySession=null;directoryProjects=[];directoryLoad=null;directoryLoaded=false;if(directoryExpiry)clearTimeout(directoryExpiry);directoryExpiry=undefined;
     try{directorySessionStorage?.removeItem(directorySessionKey);}catch(_){}
+    try{directoryStorage?.removeItem(rememberedSessionKey);}catch(_){}directoryRemembered=false;
     directoryChanged(message);
   }
-  function expireDirectory(){if(directoryExpiry)clearTimeout(directoryExpiry);directoryExpiry=undefined;if(directoryUnlocked()){directoryExpiry=setTimeout(()=>lockDirectory('목록 접속 시간이 만료되었습니다. 목록 관리자 비밀번호로 다시 열어 주세요.'),directorySession.expiresAt-Date.now());directoryExpiry?.unref?.();}}
-  function storeDirectorySession(result){
+  function expireDirectory(){if(directoryExpiry)clearTimeout(directoryExpiry);directoryExpiry=undefined;if(directoryUnlocked()){directoryExpiry=setTimeout(()=>directoryUnlocked()?expireDirectory():lockDirectory('목록 접속 시간이 만료되었습니다. 목록 관리자 비밀번호로 다시 열어 주세요.'),Math.min(2147483647,directorySession.expiresAt-Date.now()));directoryExpiry?.unref?.();}}
+  function storeDirectorySession(result,remember=false){
     if(typeof result.directoryToken!=='string'||!Number.isFinite(result.expiresAt)||result.expiresAt<=Date.now())throw new Error('목록 접속 정보를 확인하지 못했습니다.');
     directorySession={directoryToken:result.directoryToken,expiresAt:result.expiresAt,endpoint};
+    directoryRemembered=false;
+    try{directoryStorage?.removeItem(rememberedSessionKey);if(remember){if(!directoryStorage)throw new Error();directoryStorage.setItem(rememberedSessionKey,JSON.stringify(directorySession));directoryRemembered=true;}}catch(_){if(remember)throw new Error('이 브라우저에 접속 정보를 저장할 수 없습니다. 기억하기를 해제한 뒤 다시 시도해 주세요.');}
     try{directorySessionStorage?.setItem(directorySessionKey,JSON.stringify(directorySession));}catch(_){}
     expireDirectory();
   }
@@ -67,6 +73,8 @@
         }else wrap.append(input);
         input.oninput=()=>{if(attempted)validate();};body.append(wrap);return input;
       });
+      let remember;
+      if(options.remember!==undefined){const label=document.createElement('label');label.className='pages-field';remember=document.createElement('input');remember.type='checkbox';remember.checked=!!options.remember;remember.style.width='auto';const caption=document.createElement('span');caption.textContent='이 기기에서 관리자 접속 기억 (90일)';label.append(remember,caption);body.append(label);}
       function validate(){
         inputs.forEach(input=>input.setAttribute('aria-invalid','false'));
         for(let i=0;i<labels.length;i++){
@@ -86,7 +94,7 @@
       if(options.cancel)cancel.textContent=options.cancel;
       if(options.submit)done.textContent=options.submit;
       const close=document.createElement('button');close.type='button';close.className='pages-close credential-close';close.textContent='×';close.setAttribute('aria-label',`${title} 닫기`);close.onclick=()=>finish(null);body.append(close);
-      body.onsubmit=event=>{event.preventDefault();attempted=true;const invalid=validate();if(invalid){invalid.focus();return;}finish(inputs.map(input=>input.value));};cancel.onclick=()=>finish(null);
+      body.onsubmit=event=>{event.preventDefault();attempted=true;const invalid=validate();if(invalid){invalid.focus();return;}const values=inputs.map(input=>input.value);if(remember)values.remember=remember.checked;finish(values);};cancel.onclick=()=>finish(null);
     });
   }
   async function proof(password, salt) {
@@ -120,6 +128,7 @@
     return ready;
   }
   async function rpc(action, body={}) {
+    const requestedDirectoryGeneration=directoryGeneration;
     const requestedProject=body.id||project?.id,requestedToken=token;
     await connect();
     return new Promise((resolve,reject)=>{
@@ -129,11 +138,13 @@
       const request=JSON.parse(JSON.stringify({action,id:project?.id,token,...body}));
       peer.postMessage({channel:'reqly-drive-v1',nonce,requestId,request},peerOrigin);
     }).catch(error=>{
+      if(error.code==='DIRECTORY_AUTH'&&body.directoryToken&&requestedDirectoryGeneration===directoryGeneration&&body.directoryToken===directorySession?.directoryToken)lockDirectory(error.message);
       if(['AUTH','NOT_FOUND'].includes(error.code)&&['load','save','download','removeFile','selectRfp','qaPublish','qaUnpublish','qaDelete'].includes(action)&&project?.id===requestedProject&&token===requestedToken)window.ReqlyShared.disconnect();
       throw error;
     });
   }
   function accept(result) {
+    if(result.project&&deletedProjects.has(result.project.id))return project;
     if(result.token)token=result.token;if(result.role)role=result.role;
     // A load started before a save can finish after it. Never roll back revisions.
     if(result.project&&project?.id===result.project.id&&result.project.version<project.version)return project;
@@ -159,6 +170,7 @@
     get project(){return project;}, get role(){return role;},
     get directoryUnlocked(){return directoryUnlocked();},
     get directoryLoaded(){return directoryLoaded;},
+    get directoryRemembered(){return directoryRemembered;},
     get canSetupDirectory(){return !!setupNonce;},
     lockDirectory,
     async refreshDirectory(){
@@ -173,11 +185,11 @@
             const result=await rpc('directoryList',{directoryToken:session.directoryToken,...(cursor?{cursor}:{})});
             if(generation!==directoryGeneration||!directoryUnlocked())return [];
             if(!Array.isArray(result.projects))throw new Error('프로젝트 목록 응답을 확인하지 못했습니다.');
-            for(const item of result.projects)if(/^[a-f0-9]{64}$/.test(item.id||''))records.set(item.id,{id:item.id,name:String(item.name||'이름 없는 프로젝트'),updatedAt:String(item.updatedAt||'')});
+            for(const item of result.projects)if(/^[a-f0-9]{64}$/.test(item.id||'')&&!deletedProjects.has(item.id))records.set(item.id,{id:item.id,name:String(item.name||'이름 없는 프로젝트'),updatedAt:String(item.updatedAt||'')});
             progress?.update(`${records.size}개 프로젝트 확인 · 목록을 불러오고 있습니다.`);
             cursor=result.nextCursor||'';if(cursor&&cursors.has(cursor))throw new Error('목록을 끝까지 확인하지 못했습니다. 다시 불러와 주세요.');cursors.add(cursor);
           }while(cursor);
-          directoryProjects=[...records.values()].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));directoryLoaded=true;directoryChanged();return clone(directoryProjects);
+          directoryProjects=[...records.values()].filter(item=>!deletedProjects.has(item.id)).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));directoryLoaded=true;directoryChanged();return clone(directoryProjects);
         }catch(error){
           if(generation===directoryGeneration&&['DIRECTORY_AUTH','DIRECTORY_UNCONFIGURED'].includes(error.code))lockDirectory(error.message);
           throw error;
@@ -185,19 +197,20 @@
       })();
       directoryLoad=work;try{return await work;}finally{if(directoryLoad===work)directoryLoad=null;}
     },
-    async unlockDirectory(){
-      if(directoryUnlocked()){await this.refreshDirectory();return true;}
-      lockDirectory();let generation=directoryGeneration,message='각 프로젝트의 비밀번호와 별도로 설정한 목록 관리자 비밀번호를 입력해 주세요.';
+    async unlockDirectory(options={}){
+      if(directoryUnlocked()&&!options.configure){await this.refreshDirectory();return true;}
+      const remembered=options.configure?directoryRemembered:false;
+      if(!options.configure)lockDirectory();let generation=directoryGeneration,message='목록 관리자 비밀번호로 모든 프로젝트를 열 수 있습니다. 기억하기를 선택하면 이 기기에서 90일 동안 다시 입력하지 않습니다.';
       while(true){
-        const entry=await fields('전체 프로젝트 목록 열기',[{label:'목록 관리자 비밀번호',password:true}],{description:message,submit:'목록 열기'});
+        const entry=await fields(options.configure?'관리자 접속 기억 설정':'전체 프로젝트 목록 열기',[{label:'목록 관리자 비밀번호',password:true}],{description:message,submit:options.configure?'설정 저장':'목록 열기',remember:remembered});
         if(!entry||generation!==directoryGeneration)return false;
         const progress=window.ReqlyProjectPicker?.loading('목록 관리자 비밀번호를 확인하고 있습니다','저장소에 연결하고 있습니다.');
         try{
           const challenge=await rpc('directoryChallenge');
           if(!challenge.configured)throw new Error('목록 관리자 비밀번호의 최초 설정이 필요합니다. 서비스 관리자에게 문의해 주세요.');
-          const result=await rpc('directoryLogin',{proof:await proof(entry[0],challenge.salt)});
+          const result=await rpc('directoryLogin',{proof:await proof(entry[0],challenge.salt),remember:entry.remember===true});
           if(generation!==directoryGeneration)return false;
-          storeDirectorySession(result);progress?.close();
+          storeDirectorySession(result,entry.remember===true);progress?.close();
           await this.refreshDirectory();return true;
         }catch(error){if(generation!==directoryGeneration)return false;if(error.code!=='DIRECTORY_AUTH')throw error;message=error.message;lockDirectory();generation=directoryGeneration;}
         finally{progress?.close();}
@@ -223,14 +236,16 @@
     async changeDirectoryPassword(){
       if(!directoryUnlocked())throw new Error('전체 목록을 먼저 열어 주세요.');
       const generation=directoryGeneration,session=directorySession;
-      const entry=await fields('목록 관리자 비밀번호 변경',[{label:'현재 목록 관리자 비밀번호',password:true},{label:'새 목록 관리자 비밀번호',password:true,autocomplete:'new-password'},{label:'새 목록 관리자 비밀번호 확인',password:true,autocomplete:'new-password',mustMatch:1}],{description:'전체 목록을 여는 비밀번호를 변경합니다. 각 프로젝트의 비밀번호는 유지됩니다.',submit:'비밀번호 변경'});
+      const entry=await fields('목록 관리자 비밀번호 변경',[{label:'현재 목록 관리자 비밀번호',password:true},{label:'새 목록 관리자 비밀번호',password:true,autocomplete:'new-password'},{label:'새 목록 관리자 비밀번호 확인',password:true,autocomplete:'new-password',mustMatch:1}],{description:'전체 목록을 여는 비밀번호를 변경합니다. 다른 기기의 관리자 접속은 해제되며 각 프로젝트의 비밀번호는 유지됩니다.',submit:'비밀번호 변경',remember:directoryRemembered});
       if(!entry||generation!==directoryGeneration)return false;
       const progress=window.ReqlyProjectPicker?.loading('목록 관리자 비밀번호를 변경하고 있습니다','비밀번호를 확인하고 있습니다.');
       try{
         const {salt}=await rpc('directoryChallenge');
-        const result=await rpc('directoryChangePassword',{directoryToken:session.directoryToken,currentProof:await proof(entry[0],salt),newProof:await proof(entry[1],salt)});
+        const result=await rpc('directoryChangePassword',{directoryToken:session.directoryToken,currentProof:await proof(entry[0],salt),newProof:await proof(entry[1],salt),remember:entry.remember===true});
         if(generation!==directoryGeneration)return false;
-        storeDirectorySession(result);directoryChanged('목록 관리자 비밀번호를 변경했습니다.');return true;
+        storeDirectorySession(result,entry.remember===true);
+        if(project){const selectedId=project.id;try{const renewed=await rpc('directoryOpen',{id:selectedId,directoryToken:result.directoryToken});if(project?.id===selectedId&&generation===directoryGeneration)accept(renewed);}catch(_){this.disconnect();directoryChanged('비밀번호를 변경했습니다. 프로젝트를 다시 열어 주세요.');return true;}}
+        directoryChanged('목록 관리자 비밀번호를 변경했습니다.');return true;
       }catch(error){if(generation!==directoryGeneration)return false;if(['DIRECTORY_AUTH','DIRECTORY_UNCONFIGURED'].includes(error.code))lockDirectory(error.message);throw error;}
       finally{progress?.close();}
     },
@@ -246,6 +261,12 @@
           if(selection.create){await this.create();}
           else{
             let result;
+            if(directoryUnlocked()){
+              const generation=directoryGeneration,session=directorySession;
+              beginLoading(selection.name?`‘${selection.name}’ 여는 중`:'프로젝트를 불러오는 중입니다','관리자 권한으로 프로젝트를 열고 있습니다.');
+              result=await rpc('directoryOpen',{id:selection.id,directoryToken:session.directoryToken});
+              if(generation!==directoryGeneration||!directoryUnlocked())throw new Error('관리자 접속이 해제되었습니다. 다시 접속해 주세요.');
+            }
             while(!result){
               const entry=await fields('프로젝트 접속',[{label:'프로젝트 비밀번호',password:true}],{description:message||(selection.name?`‘${selection.name}’ 프로젝트의 비밀번호를 입력해 주세요.`:'선택한 프로젝트의 비밀번호를 입력해 주세요.'),cancel:'프로젝트 목록으로'});
               if(entry===null){message='';break;}
@@ -283,21 +304,27 @@
     },
     async deleteProject(target){
       if(!/^[a-f0-9]{64}$/.test(target?.id||'')||!target.name)throw new Error('삭제할 프로젝트를 확인해 주세요.');
-      const entry=await fields('프로젝트 삭제',[{label:'관리자용 비밀번호',password:true},{label:'삭제할 프로젝트 이름',equals:target.name}],{
-        description:`‘${target.name}’ 프로젝트와 첨부 파일을 삭제합니다. 공유 링크로도 열 수 없게 됩니다. 자료는 Google Drive 휴지통으로 이동합니다. 관리자용 비밀번호와 위 프로젝트 이름을 입력해 주세요.`,submit:'프로젝트 삭제'});
-      if(!entry)return false;
+      const directoryToken=directoryUnlocked()?directorySession.directoryToken:'',projectToken=project?.id===target.id&&role==='admin'?token:'';
+      let entry;
+      if(!directoryToken&&!projectToken){
+        entry=await fields('프로젝트 삭제 권한 확인',[{label:'해당 프로젝트의 관리자 비밀번호',password:true}],{description:`‘${target.name}’을 만들 때 설정한 프로젝트 관리자 비밀번호를 입력해 주세요. 전체 목록의 관리자 비밀번호와는 다릅니다.`,submit:'다음'});
+        if(!entry)return false;
+      }
+      if(!(await fields('프로젝트 삭제 확인',[],{description:`‘${target.name}’ 프로젝트를 정말 삭제하시겠습니까? 첨부 파일과 작성 내용이 함께 Google Drive 휴지통으로 이동하며 공유 링크로는 열 수 없게 됩니다.`,submit:'삭제'})))return false;
       const progress=window.ReqlyProjectPicker?.loading('프로젝트를 삭제하고 있습니다','진행 중인 저장을 마무리하고 있습니다.');
-      try{
-        await saveQueue;busy=true;progress?.update('관리자 비밀번호를 확인하고 있습니다.');
-        const challenge=await rpc('challenge',{id:target.id});
-        const credential=await proof(entry[0],challenge.salt);progress?.update('선택한 프로젝트를 휴지통으로 이동하고 있습니다.');
-        const result=await rpc('deleteProject',{id:target.id,proof:credential,confirmName:entry[1]});
+      const operation=saveQueue.then(async()=>{try{
+        busy=true;
+        const auth=directoryToken?{directoryToken}:projectToken?{token:projectToken}:{proof:await proof(entry[0],(await rpc('challenge',{id:target.id})).salt)};
+        progress?.update('선택한 프로젝트를 휴지통으로 이동하고 있습니다.');
+        const result=await rpc('deleteProject',{id:target.id,...auth,confirmed:true});
         if(!result.deleted||result.id!==target.id)throw new Error('삭제 완료를 확인하지 못했습니다. 프로젝트 목록을 다시 확인해 주세요.');
+        deletedProjects.add(target.id);
         directory?.forget(target.id);
         updateDirectoryProject(target,true);
         if(project?.id===target.id)this.disconnect();
         return true;
-      }finally{busy=false;progress?.close();}
+      }finally{busy=false;progress?.close();}});
+      saveQueue=operation.catch(()=>{});return operation;
     },
     async renameProject(target){
       if(!/^[a-f0-9]{64}$/.test(target?.id||'')||!target.name)throw new Error('변경할 프로젝트를 확인해 주세요.');

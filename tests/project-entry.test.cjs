@@ -27,6 +27,7 @@ function browser({query='',projects=true,restoredDirectory=true,fail=false,holdL
     if(r.action==='directoryChallenge')result={ok:true,value:{configured:true,salt:'d'.repeat(64)}};
     else if(r.action==='directoryLogin')result={ok:true,value:{directoryToken:'directory-fixture',expiresAt:Date.now()+3600000}};
     else if(r.action==='directoryList')result=directoryError?{ok:false,code:'DIRECTORY_AUTH',error:'목록 관리자 접속이 만료되었습니다.'}:{ok:true,value:{projects:globalProjects.map(item=>({...item})),nextCursor:''}};
+    else if(r.action==='directoryOpen')result={ok:true,value:{project:{id:r.id,name:'프로젝트 '+r.id[0],version:1,workspace:{requirements:[]}},role:'admin',token:'directory-project-fixture'}};
     else if(r.action==='challenge')result={ok:true,value:{salt:'0'.repeat(64)}};
     else if(r.action==='login'){
       loginCount++;
@@ -52,7 +53,7 @@ function browser({query='',projects=true,restoredDirectory=true,fail=false,holdL
   const password=()=>{const form=all(body).find(node=>node.tag==='form'&&all(node).some(n=>n.type==='password'));assert.ok(form);return form;};
   return{api:context.window.ReqlyShared,body,requests,get projectRequests(){return requests.filter(r=>!r.action.startsWith('directory'));},sessions,location,find,click,password,copied,failDirectory:()=>directoryError=true,release:()=>held.splice(0).forEach(fn=>fn()),
     action(letter,label){const row=all(body).find(node=>node.tag==='article'&&all(node).some(n=>n.textContent==='프로젝트 '+letter));assert.ok(row);return all(row).find(node=>node.tag==='button'&&node.textContent===label).onclick();},
-    submitDelete(name){const form=password(),inputs=all(form).filter(node=>node.tag==='input');inputs[0].value='fixture-password';inputs[1].value=name;form.onsubmit({preventDefault(){}});},
+    submitDelete(){const form=all(body).find(node=>node.tag==='form'&&all(node).some(n=>n.textContent==='프로젝트 삭제 확인'));assert.ok(form);assert.equal(all(form).filter(n=>n.tag==='input').length,0);form.onsubmit({preventDefault(){}});},
     submitRename(name){const form=all(body).find(node=>node.tag==='form'&&all(node).some(n=>n.textContent==='프로젝트 이름 변경')),inputs=all(form).filter(node=>node.tag==='input');inputs[0].value=name;if(inputs[1])inputs[1].value='fixture-password';form.onsubmit({preventDefault(){}});},
     select(letter){const row=all(body).find(node=>node.tag==='article'&&all(node).some(n=>n.textContent==='프로젝트 '+letter));assert.ok(row);all(row).find(node=>node.tag==='button').onclick();},
     submitPassword(){const form=password();all(form).find(node=>node.type==='password').value='fixture-password';form.onsubmit({preventDefault(){}});}};
@@ -99,13 +100,8 @@ test('restored directory loading has a visible progress state until remote metad
   b.release();await tick();assert.equal(all(b.body).filter(node=>node.tag==='article').length,3);
   assert.equal(all(b.body).some(node=>node.className?.includes('project-loading')),false);
 });
-test('select existing project, cancel password, select another and open without creating anything',async()=>{
-  const b=browser(),boot=b.api.start();await tick();b.select('b');await tick();
-  assert.ok(b.password());assert.equal(b.projectRequests.length,0);b.click('프로젝트 목록으로');await tick();
-  assert.ok(b.find('h2','프로젝트'));b.select('c');await tick();b.submitPassword();await boot;
-  assert.equal(b.api.project.id,'c'.repeat(64));assert.equal(b.location.searchParams.get('project'),'c'.repeat(64));
-  assert.deepEqual(b.projectRequests.map(r=>r.action),['challenge','login']);
-});
+test('directory administrator opens a selected project without a password or creation request',async()=>{const b=browser(),boot=b.api.start();await tick();b.select('b');await boot;assert.equal(b.api.project.id,'b'.repeat(64));assert.equal(b.api.role,'admin');assert.equal(all(b.body).some(n=>n.type==='password'),false);assert.deepEqual(b.requests.map(r=>r.action),['directoryList','directoryOpen']);assert.equal(b.requests[1].directoryToken,'directory-fixture');});
+
 test('create appears only after explicit click and cancel returns to the existing list',async()=>{
   const b=browser();b.api.start();await tick();b.click('새 프로젝트 만들기');await tick();assert.ok(b.find('h2','새 프로젝트'));
   b.click('프로젝트 목록으로');await tick();assert.ok(b.find('h2','프로젝트'));assert.equal(b.projectRequests.length,0);
@@ -114,7 +110,7 @@ test('empty directory stays a list with a link option instead of forcing creatio
   const b=browser({projects:false});b.api.start();await tick();assert.ok(b.find('h2','프로젝트'));assert.ok(b.find('button','링크로 열기'));assert.equal(b.projectRequests.length,0);
 });
 test('password failure allows retry and never exposes project contents until login succeeds',async()=>{
-  const b=browser({fail:true}),boot=b.api.start();await tick();b.select('a');await tick();b.submitPassword();await tick();
+  const b=browser({fail:true,restoredDirectory:false,query:'?project='+'a'.repeat(64)}),boot=b.api.start();await tick();b.submitPassword();await tick();
   assert.equal(b.api.project,undefined);assert.ok(b.find('p','비밀번호가 일치하지 않습니다.'));b.submitPassword();await boot;assert.equal(b.api.project.id,'a'.repeat(64));
 });
 test('a direct project link still asks its password and cancellation opens the list',async()=>{
@@ -139,14 +135,14 @@ test('explicit new-project navigation preserves creation and cancel returns to l
 });
 
 test('loading is visible through delayed login and remains until the rendered screen is ready',async()=>{
-  const b=browser({holdLogin:true}),boot=b.api.start();await tick();b.select('a');await tick();b.submitPassword();await tick();
+  const b=browser({holdLogin:true,restoredDirectory:false,query:'?project='+'a'.repeat(64)}),boot=b.api.start();await tick();b.submitPassword();await tick();
   assert.ok(b.find('p','프로젝트와 저장된 내용을 불러오고 있습니다.'));assert.equal(b.api.project,undefined);
   b.release();await boot;assert.ok(b.find('p','요구사항 목록과 화면을 구성하고 있습니다.'));b.api.finishLoading();
   assert.equal(all(b.body).some(node=>node.className?.includes('project-loading')),false);
 });
 
 test('a failed login removes the loading overlay and allows a retry',async()=>{
-  const b=browser({fail:true});b.api.start();await tick();b.select('a');await tick();b.submitPassword();await tick();
+  const b=browser({fail:true,restoredDirectory:false,query:'?project='+'a'.repeat(64)});b.api.start();await tick();b.submitPassword();await tick();
   assert.equal(all(b.body).some(node=>node.className?.includes('project-loading')),false);assert.ok(b.password());
 });
 
@@ -156,16 +152,12 @@ test('directory sharing copies only the selected project URL without project log
   all(b.body).find(node=>node.attributes['aria-label']==='프로젝트 공유 닫기').onclick();assert.ok(b.find('h2','프로젝트'));
 });
 
-test('delete cancellation and mismatched name never send a deletion request',async()=>{
-  const b=browser();b.api.start();await tick();const task=b.action('a','삭제');await tick();b.submitDelete('wrong');await tick();
-  assert.ok(b.find('p','삭제할 프로젝트 이름을 정확히 입력해 주세요.'));assert.equal(b.projectRequests.length,0);
-  b.click('취소');await task;assert.equal(b.api.knownProjects().length,3);
-});
+test('delete cancellation never sends a deletion request and no project name input is shown',async()=>{const b=browser();b.api.start();await tick();const task=b.action('a','삭제');await tick();assert.ok(b.find('h2','프로젝트 삭제 확인'));assert.equal(all(b.body).some(n=>n.type==='password'),false);assert.equal(b.projectRequests.length,0);b.click('취소');await task;assert.equal(b.api.knownProjects().length,3);});
 
 test('successful deletion forgets only selected project after server confirmation',async()=>{
   const b=browser();b.api.start();await tick();const task=b.action('b','삭제');await tick();b.submitDelete('프로젝트 b');await task;
   assert.deepEqual(Array.from(b.api.knownProjects(),item=>item.id).sort(),['a'.repeat(64),'c'.repeat(64)]);
-  assert.deepEqual(b.projectRequests.map(r=>r.action),['challenge','deleteProject']);assert.equal(b.projectRequests[1].confirmName,'프로젝트 b');
+  assert.deepEqual(b.projectRequests.map(r=>r.action),['deleteProject']);assert.equal(b.projectRequests[0].confirmed,true);assert.equal(b.projectRequests[0].directoryToken,'directory-fixture');assert.equal(b.projectRequests[0].confirmName,undefined);
   assert.equal(all(b.body).filter(x=>x.tag==='article').length,2);
 });
 
@@ -192,13 +184,13 @@ test('failed rename leaves the directory unchanged and reports failure',async()=
 });
 
 test('current administrator renames without entering a password again or switching projects',async()=>{
-  const b=browser({role:'admin'}),boot=b.api.start();await tick();b.select('a');await tick();b.submitPassword();await boot;b.api.finishLoading();const address=b.location.href;
+  const b=browser({role:'admin'}),boot=b.api.start();await tick();b.select('a');await boot;b.api.finishLoading();const address=b.location.href;
   const task=b.api.renameProject(b.api.project);await tick();assert.equal(all(b.body).some(n=>n.type==='password'),false);b.submitRename('현재 프로젝트 새 이름');await task;
-  assert.equal(b.api.project.name,'현재 프로젝트 새 이름');assert.equal(b.api.project.id,'a'.repeat(64));assert.equal(b.location.href,address);assert.deepEqual(b.projectRequests.map(r=>r.action),['challenge','login','renameProject']);
+  assert.equal(b.api.project.name,'현재 프로젝트 새 이름');assert.equal(b.api.project.id,'a'.repeat(64));assert.equal(b.location.href,address);assert.deepEqual(b.projectRequests.map(r=>r.action),['renameProject']);
 });
 
 test('renaming another project preserves the active project and its connection',async()=>{
-  const b=browser({role:'admin'}),boot=b.api.start();await tick();b.select('a');await tick();b.submitPassword();await boot;b.api.finishLoading();
+  const b=browser({role:'admin'}),boot=b.api.start();await tick();b.select('a');await boot;b.api.finishLoading();
   const original=JSON.stringify(b.api.project),address=b.location.href,target=b.api.knownProjects().find(p=>p.id==='b'.repeat(64));
   const task=b.api.renameProject(target);await tick();assert.ok(b.password());b.submitRename('다른 프로젝트 새 이름');await task;
   assert.equal(JSON.stringify(b.api.project),original);assert.equal(b.location.href,address);assert.equal(b.api.role,'admin');assert.equal(b.api.knownProjects().find(p=>p.id===target.id).name,'다른 프로젝트 새 이름');

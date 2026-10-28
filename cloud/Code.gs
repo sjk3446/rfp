@@ -16,7 +16,7 @@ function doGet(e) {
 function reqlyRpc(request) {
   try {
     const actions = ['challenge', 'create', 'login', 'load', 'save', 'password', 'upload', 'download', 'removeFile', 'selectRfp', 'deleteProject', 'renameProject',
-      'directoryChallenge', 'directorySetupChallenge', 'directorySetup', 'directoryLogin', 'directoryList', 'directoryChangePassword', 'qaPublish', 'qaUnpublish', 'qaDelete'];
+      'directoryChallenge', 'directorySetupChallenge', 'directorySetup', 'directoryLogin', 'directoryList', 'directoryOpen', 'directoryChangePassword', 'qaPublish', 'qaUnpublish', 'qaDelete'];
     if (!request || !actions.includes(request.action)) throw new Error('지원하지 않는 요청입니다.');
     const lock = LockService.getScriptLock();
     lock.waitLock(25000);
@@ -97,8 +97,10 @@ function credentials_(auth) {
   if (!auth || !/^[a-f0-9]{64}$/.test(auth.salt || '')) throw new Error('비밀번호 설정이 필요합니다.');
   return { salt: auth.salt, hash: mac_(proof_(auth.proof)), epoch: random_() };
 }
-function token_(data, role) {
-  const body = Utilities.base64EncodeWebSafe(JSON.stringify({ id: data.id, role: role, epoch: data.auth[role].epoch, nonce: random_() }), Utilities.Charset.UTF_8);
+function token_(data, role, directoryClaim) {
+  const claim = { id: data.id, role: role, epoch: data.auth[role].epoch, nonce: random_() };
+  if (directoryClaim) { claim.directoryEpoch = directoryClaim.epoch; claim.expiresAt = directoryClaim.expiresAt; }
+  const body = Utilities.base64EncodeWebSafe(JSON.stringify(claim), Utilities.Charset.UTF_8);
   return body + '.' + mac_(body);
 }
 function authorize_(record, token, admin) {
@@ -108,6 +110,7 @@ function authorize_(record, token, admin) {
   try { claim = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString('UTF-8')); }
   catch (_) { fail_('AUTH', '접속 정보가 올바르지 않습니다.'); }
   if (claim.id !== record.data.id || !['admin', 'user'].includes(claim.role) || claim.epoch !== record.data.auth[claim.role].epoch) fail_('AUTH', '비밀번호가 변경되었습니다. 다시 접속해 주세요.');
+  if (claim.directoryEpoch && (claim.directoryEpoch !== directoryAccess_()?.epoch || !Number.isFinite(claim.expiresAt) || claim.expiresAt <= Date.now())) fail_('AUTH', '관리자 접속이 만료되었거나 비밀번호가 변경되었습니다. 다시 접속해 주세요.');
   if (admin && claim.role !== 'admin') fail_('FORBIDDEN', '관리자만 사용할 수 있습니다.');
   return claim.role;
 }
@@ -202,8 +205,8 @@ function directoryReadSigned_(purpose, token, code) {
   if (!claim || claim.purpose !== purpose || !Number.isFinite(claim.expiresAt) || claim.expiresAt <= Date.now()) fail_(code, '전체 목록 접속 시간이 만료되었습니다. 다시 접속해 주세요.');
   return claim;
 }
-function directorySession_(access) {
-  const expiresAt = Date.now() + 12 * 60 * 60000;
+function directorySession_(access, remember) {
+  const expiresAt = Date.now() + (remember === true ? 90 * 24 : 12) * 60 * 60000;
   return { directoryToken: directorySign_('session', { purpose: 'session', epoch: access.epoch, nonce: random_(), expiresAt: expiresAt }), expiresAt: expiresAt };
 }
 function directoryAuthorize_(token, access) {
@@ -269,12 +272,16 @@ function directoryDispatch_(r) {
     return directorySession_(next);
   }
   if (!access) fail_('DIRECTORY_UNCONFIGURED', '전체 목록 관리자 비밀번호 설정이 필요합니다.');
-  if (r.action === 'directoryLogin') { directoryCheckProof_(access, r.proof); return directorySession_(access); }
+  if (r.action === 'directoryLogin') { directoryCheckProof_(access, r.proof); return directorySession_(access, r.remember); }
   if (r.action === 'directoryList') return directoryList_(r, access);
+  if (r.action === 'directoryOpen') {
+    const claim = directoryAuthorize_(r.directoryToken, access), record = record_(r.id);
+    return { project: public_(record.data), role: 'admin', token: token_(record.data, 'admin', claim) };
+  }
   if (r.action === 'directoryChangePassword') {
     directoryAuthorize_(r.directoryToken, access); directoryCheckProof_(access, r.currentProof);
     access.hash = directoryProofHash_(r.newProof); access.epoch = random_(); directorySaveAccess_(access);
-    return directorySession_(access);
+    return directorySession_(access, r.remember);
   }
   throw new Error('지원하지 않는 요청입니다.');
 }
@@ -300,9 +307,12 @@ function dispatch_(r) {
     return { project: public_(data), role: role, token: token_(data, role) };
   }
   if (r.action === 'deleteProject') {
-    // Require fresh administrator proof even if the caller has an existing token.
-    if (loginRole_(record, r.proof) !== 'admin') fail_('FORBIDDEN', '프로젝트 삭제는 관리자용 비밀번호로만 가능합니다.');
-    if (r.confirmName !== data.name) fail_('CONFIRM', '삭제할 프로젝트 이름을 정확히 입력해 주세요.');
+    if (r.directoryToken) directoryAuthorize_(r.directoryToken, directoryAccess_());
+    else if (r.proof) {
+      if (loginRole_(record, r.proof) !== 'admin') fail_('FORBIDDEN', '해당 프로젝트의 관리자만 삭제할 수 있습니다.');
+    } else authorize_(record, r.token, true);
+    // Keep old clients compatible while new clients submit explicit confirmation.
+    if (r.confirmed !== true && r.confirmName !== data.name) fail_('CONFIRM', '프로젝트 삭제 여부를 확인해 주세요.');
     // Preserve project.json and attachments together for the Drive owner's recovery.
     record.folder.setTrashed(true);
     return { deleted: true, id: data.id };

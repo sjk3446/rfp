@@ -158,12 +158,12 @@ test('rename preserves project ID, workspace, passwords and other projects; poll
 });
 test('create returns project-scoped administrator token and no password hashes',()=>{const{create}=backend(),p=create();assert.equal(p.role,'admin');assert.equal(p.project.workspace.requirements.length,0);assert.equal(JSON.stringify(p.project).includes('auth'),false);});
 
-test('project deletion requires fresh administrator proof and exact name, not just a token',()=>{
+test('project deletion requires administrator authorization and confirmation',()=>{
   const {rpc,create,folderFor}=backend(),p=create(),id=p.project.id;
   for(const [proof,confirmName,code]of [['3'.repeat(64),'Test','AUTH'],['2'.repeat(64),'Test','FORBIDDEN'],['1'.repeat(64),'wrong','CONFIRM']]){
     assert.equal(rpc({action:'deleteProject',id,token:p.token,proof,confirmName}).code,code);assert.equal(folderFor(id).isTrashed(),false);
   }
-  assert.equal(rpc({action:'deleteProject',id,token:p.token,confirmName:'Test'}).ok,false);
+  assert.equal(rpc({action:'deleteProject',id,token:p.token}).code,'CONFIRM');
   assert.equal(rpc({action:'load',id,token:p.token}).ok,true);
 });
 
@@ -209,4 +209,34 @@ test('business overview metadata is shared without modifying requirements and st
   const loaded=rpc({action:'load',...auth}).value.project.workspace;
   assert.equal(loaded.document.overviewByAsset.source.items[0].content,'계약 후 12개월');assert.equal(loaded.requirements[0].description,'keep my work');
   assert.equal(rpc({action:'save',...auth,changes:[],metadata:{document:null,references:[]},expectedVersion:saved.version}).code,'CONFLICT');
+});
+
+
+test('remembered directory sessions last 90 days and password change revokes old sessions and their project access',()=>{
+ const b=backend(),p=b.create(),initial=b.directory();
+ const remembered=b.rpc({action:'directoryLogin',proof:'5'.repeat(64),remember:true}).value;
+ assert.equal(remembered.expiresAt-initial.expiresAt,(90*24-12)*3600000);
+ const opened=b.rpc({action:'directoryOpen',id:p.project.id,directoryToken:remembered.directoryToken});assert.equal(opened.ok,true);assert.equal(opened.value.role,'admin');
+ b.advance(13*3600000);assert.equal(b.rpc({action:'directoryList',directoryToken:initial.directoryToken}).code,'DIRECTORY_AUTH');
+ assert.equal(b.rpc({action:'directoryList',directoryToken:remembered.directoryToken}).ok,true);
+ const changed=b.rpc({action:'directoryChangePassword',directoryToken:remembered.directoryToken,currentProof:'5'.repeat(64),newProof:'6'.repeat(64),remember:true});assert.equal(changed.ok,true);
+ assert.equal(b.rpc({action:'directoryOpen',id:p.project.id,directoryToken:remembered.directoryToken}).code,'DIRECTORY_AUTH');
+ assert.equal(b.rpc({action:'load',id:p.project.id,token:opened.value.token}).code,'AUTH');
+ assert.equal(b.rpc({action:'login',id:p.project.id,proof:'1'.repeat(64)}).ok,true);
+ assert.equal(b.rpc({action:'directoryOpen',id:p.project.id,directoryToken:changed.value.directoryToken}).ok,true);
+});
+test('directory administrator deletion needs confirmation, preserves other projects and supports trash recovery',()=>{
+ const b=backend(),p=b.create(),other=b.create(),d=b.directory(),auth={action:'deleteProject',id:p.project.id,directoryToken:d.directoryToken};
+ assert.equal(b.rpc(auth).code,'CONFIRM');assert.equal(b.folderFor(p.project.id).isTrashed(),false);
+ assert.equal(b.rpc({...auth,directoryToken:'forged',confirmed:true}).code,'DIRECTORY_AUTH');
+ assert.equal(b.rpc({...auth,confirmed:true}).ok,true);assert.equal(b.folderFor(p.project.id).isTrashed(),true);
+ assert.equal(b.rpc({action:'load',id:other.project.id,token:other.token}).ok,true);
+ b.folderFor(p.project.id).setTrashed(false);assert.equal(b.rpc({action:'load',id:p.project.id,token:p.token}).ok,true);
+});
+test('ordinary project administrator can delete with its own session but a user or other project cannot',()=>{
+ const b=backend(),p=b.create(),other=b.create(),user=b.rpc({action:'login',id:p.project.id,proof:'2'.repeat(64)}).value;
+ assert.equal(b.rpc({action:'deleteProject',id:p.project.id,token:user.token,confirmed:true}).code,'FORBIDDEN');
+ assert.equal(b.rpc({action:'deleteProject',id:p.project.id,token:other.token,confirmed:true}).code,'AUTH');
+ assert.equal(b.rpc({action:'directoryOpen',id:p.project.id,directoryToken:p.token}).ok,false);
+ assert.equal(b.rpc({action:'deleteProject',id:p.project.id,token:p.token,confirmed:true}).ok,true);
 });

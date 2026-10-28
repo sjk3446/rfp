@@ -18,12 +18,13 @@ class Element {
   focus() { this.focused = true; }
 }
 const walk = node => [node, ...node.children.flatMap(walk)];
-function browser({ hash = '', storedSession, lifetime = 5000, pages } = {}) {
+function browser({ hash = '', storedSession, storedRemembered, lifetime = 5000, pages } = {}) {
   let clock = 1800000000000, timerId = 0, nonce;
   const body = new Element('body'), listeners = {}, requests = [], events = [], timers = new Map(), held = [], holds = new Map(), overrides = new Map();
   const local = new Map(), session = new Map();
   const storage = map => ({ getItem: key => map.get(key) ?? null, setItem: (key, value) => map.set(key, value), removeItem: key => map.delete(key) });
   if (storedSession) session.set(sessionKey, JSON.stringify(typeof storedSession === 'function' ? storedSession(clock) : storedSession));
+  if(storedRemembered)local.set('reqly-directory-remembered-v1',JSON.stringify(storedRemembered));
   const location = new URL('https://sjk3446.github.io/rfp/' + hash);
   const sessionResult = () => ({ directoryToken: 'directory-session-fixture', expiresAt: clock + lifetime });
   const pageData = pages || [{ projects: [{ id: id('a'), name: '서버 전용 사업', updatedAt: '2026-10-27T00:00:00Z' }], nextCursor: '' }];
@@ -68,7 +69,7 @@ function browser({ hash = '', storedSession, lifetime = 5000, pages } = {}) {
   };
   vm.runInNewContext(fs.readFileSync(require.resolve('../shared-runtime.js'), 'utf8'), context);
   const form = () => walk(body).find(node => node.tag === 'form');
-  const submit = values => { const current = form(); assert.ok(current, 'credential form is visible'); const inputs = walk(current).filter(node => node.tag === 'input'); assert.equal(inputs.length, values.length); inputs.forEach((input, index) => { input.value = values[index]; }); current.onsubmit({ preventDefault() {} }); return inputs; };
+  const submit = values => { const current = form(); assert.ok(current, 'credential form is visible'); const inputs = walk(current).filter(node => node.tag === 'input' && node.type !== 'checkbox'); assert.equal(inputs.length, values.length); inputs.forEach((input, index) => { input.value = values[index]; }); current.onsubmit({ preventDefault() {} }); return inputs; };
   return {
     api: context.window.ReqlyShared, requests, local, session, location, events, form, body, submit,
     override(action, response) { overrides.set(action, typeof response === 'function' ? response : () => response); },
@@ -208,4 +209,24 @@ test('a cyclic pagination response cannot commit a partial replacement directory
   b.override('directoryList', { projects: [{ id: id('b'), name: '미완료 목록', updatedAt: '2026-10-27' }], nextCursor: 'repeated-cursor' });
   await assert.rejects(b.api.refreshDirectory(), /끝까지 확인/);
   assert.deepEqual(plain(b.api.knownProjects()), original); assert.equal(b.local.size, 0);
+});
+
+
+test('remembered administrator access survives a new browser session without persisting passwords or proofs',async()=>{
+ const b=browser({lifetime:90*86400000}),work=b.api.unlockDirectory();
+ walk(b.form()).find(n=>n.type==='checkbox').checked=true;b.submit(['owner-password']);await work;
+ const saved=JSON.parse(b.local.get('reqly-directory-remembered-v1'));assert.equal(b.api.directoryRemembered,true);
+ assert.equal(b.requests.find(r=>r.action==='directoryLogin').remember,true);
+ assert.deepEqual(Object.keys(saved).sort(),['directoryToken','endpoint','expiresAt']);
+ assert.equal(JSON.stringify([...b.local,...b.session]).includes('owner-password'),false);
+ const reopened=browser({storedRemembered:saved,lifetime:90*86400000});assert.equal(reopened.api.directoryUnlocked,true);assert.equal(reopened.api.directoryRemembered,true);
+ await reopened.api.refreshDirectory();assert.deepEqual(reopened.requests.map(r=>r.action),['directoryList']);
+ reopened.advance(25*86400000);assert.equal(reopened.api.directoryUnlocked,true);
+ reopened.api.lockDirectory();assert.equal(reopened.local.has('reqly-directory-remembered-v1'),false);assert.equal(reopened.session.size,0);
+});
+test('remembering can be disabled without logging out of the current session',async()=>{
+ const saved={endpoint,expiresAt:1800000000000+90*86400000,directoryToken:'remembered'};
+ const b=browser({storedRemembered:saved}),work=b.api.unlockDirectory({configure:true});
+ const checkbox=walk(b.form()).find(n=>n.type==='checkbox');assert.equal(checkbox.checked,true);checkbox.checked=false;b.submit(['owner-password']);await work;
+ assert.equal(b.api.directoryUnlocked,true);assert.equal(b.api.directoryRemembered,false);assert.equal(b.local.has('reqly-directory-remembered-v1'),false);assert.ok(b.session.get(sessionKey));
 });

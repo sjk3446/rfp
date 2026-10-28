@@ -35,14 +35,14 @@
     const gate=node('div',null,'directory-gate'),unlock=node('button','관리자로 접속','pages-action primary'),setup=node('button','목록 관리자 비밀번호 설정','pages-action');unlock.type=setup.type='button';
     gate.append(node('h3','전체 프로젝트 목록'),node('p','전체 프로젝트 목록은 목록 관리자 비밀번호로 열 수 있습니다.'),unlock,setup);
     const tools=node('div',null,'directory-tools'),count=node('span',null,'directory-count');
-    const refresh=node('button','새로고침','pages-action'),password=node('button','목록 비밀번호 변경','pages-action'),lock=node('button','목록 잠금','pages-action');
-    for(const button of [refresh,password,lock])button.type='button';tools.append(count,refresh,password,lock);
+    const refresh=node('button','새로고침','pages-action'),password=node('button','관리자 비밀번호 변경','pages-action'),remember=node('button','접속 기억 설정','pages-action'),lock=node('button','목록 잠금','pages-action');
+    for(const button of [refresh,password,remember,lock])button.type='button';tools.append(count,refresh,password,remember,lock);
     const search=node('input');search.type='search';search.placeholder='프로젝트 이름 검색';search.setAttribute('aria-label','프로젝트 이름 검색');search.className='project-picker-search';
     const area=node('div');area.setAttribute('aria-label','전체 프로젝트 목록');
     const feedback=node('p',null,'fm-notice');feedback.setAttribute('role','status');feedback.hidden=true;
     element.append(gate,tools,search,feedback,area);let working=false,destroyed=false;
     const notify=text=>{feedback.textContent=text||'';feedback.hidden=!text;};
-    const setWorking=value=>{working=value;for(const button of [unlock,setup,refresh,password,lock])button.disabled=value;};
+    const setWorking=value=>{working=value;for(const button of [unlock,setup,refresh,password,remember,lock])button.disabled=value;};
     const perform=async(fn,message)=>{
       if(working)return;setWorking(true);notify('');
       try{const result=await fn();if(result&&message)notify(message);}
@@ -52,6 +52,7 @@
     const render=()=>{
       if(destroyed)return;
       const unlocked=!!window.ReqlyShared?.directoryUnlocked;
+      remember.textContent=window.ReqlyShared?.directoryRemembered?'접속 기억 중 · 설정':'접속 기억 설정';
       gate.hidden=unlocked;setup.hidden=!window.ReqlyShared?.canSetupDirectory;tools.hidden=search.hidden=!unlocked;area.replaceChildren();
       if(!unlocked){search.value='';count.textContent='';return;}
       const projects=window.ReqlyShared.knownProjects(),query=search.value.trim().toLocaleLowerCase('ko');
@@ -74,6 +75,7 @@
     setup.onclick=()=>perform(()=>window.ReqlyShared.setupDirectory());
     refresh.onclick=()=>perform(()=>window.ReqlyShared.refreshDirectory(),'프로젝트 목록을 새로 불러왔습니다.');
     password.onclick=()=>perform(()=>window.ReqlyShared.changeDirectoryPassword(),'목록 관리자 비밀번호를 변경했습니다.');
+    remember.onclick=()=>perform(()=>window.ReqlyShared.unlockDirectory({configure:true}),'관리자 접속 기억 설정을 저장했습니다.');
     lock.onclick=()=>{window.ReqlyShared.lockDirectory();notify('전체 프로젝트 목록을 잠갔습니다.');render();};
     search.oninput=render;
     const onUpdate=event=>{if(!window.ReqlyShared?.directoryUnlocked)notify('');render();if(event.detail?.message)notify(event.detail.message);};
